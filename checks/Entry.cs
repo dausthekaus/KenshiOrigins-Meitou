@@ -3,6 +3,7 @@ using Meitou.Data;
 using Meitou.Data.Characters;
 using Meitou.Data.Fcs;
 using Meitou.Modding;
+using HarmonyLib;
 using Meitou.Simulation;
 using Meitou.Simulation.Population;
 
@@ -26,11 +27,13 @@ var host = ModHost.Load(new ModHostOptions([info], db, data, () => null, GameVer
 Check(host.Mods.Count == 1 && host.Notices.Count == 0, "actual Meitou loader accepts the manifest, DLL and hook signatures");
 Check(host.Simulation!.Systems.Single().Name == "origins", "actual loader registers the per-world origin system");
 var rows = ModLooks.Rows(new LookRowContext(db.Find("race")!, false, new FcsRecord(), true));
-Check(rows.Any(r => r.Mod == "kenshiorigins" && r.Row.Kind == LookRowKind.Choice && r.Row.Choices.Count == 4),
-    "creation editor receives the four origin choices");
+Check(!rows.Any(r => r.Mod == "kenshiorigins"), "old origin arrow row is no longer registered among body sliders");
 Check(!ModLooks.Rows(new LookRowContext(db.Find("race")!, false, new FcsRecord(), false)).Any(r => r.Mod == "kenshiorigins"),
     "origin selection is hidden in recruit and surgeon editors");
-Console.WriteLine("PASS: 4 real-loader assertions in an isolated process.");
+var editorType = typeof(IMod).Assembly.GetType("Meitou.Game.Editor.CharacterEditorPanel", true)!;
+Check(Harmony.GetPatchInfo(AccessTools.Method(editorType, "BindEditor")).Owners.Contains("kenshiorigins"),
+    "actual loader installs the description-panel binding hook");
+Console.WriteLine("PASS: 5 real-loader assertions in an isolated process.");
 
 static void Check(bool condition, string message)
 {

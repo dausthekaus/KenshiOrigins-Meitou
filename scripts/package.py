@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build a mod ZIP; game DLLs and machine-specific paths stay outside the package."""
 from pathlib import Path
+import json
 import subprocess
 import sys
 import zipfile
@@ -10,7 +11,8 @@ command = ["dotnet", "build", str(repo / "KenshiOrigins.csproj"), "-c", "Release
 if len(sys.argv) > 1:
     command.append(f"-p:MeitouDirectory={Path(sys.argv[1]).resolve(strict=True)}")
 subprocess.run(command, check=True)
-destination = repo / "artifacts/KenshiOrigins-0.1.0.zip"
+version = json.loads((repo / "meitou.json").read_text())["version"]
+destination = repo / f"artifacts/KenshiOrigins-{version}.zip"
 destination.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
     for name in ("KenshiOrigins.mod", "meitou.json", "originform.json", "LICENSE", "README.md"):

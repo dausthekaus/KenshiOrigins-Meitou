@@ -10,7 +10,7 @@ import tempfile
 
 repo = Path(__file__).resolve().parent.parent
 if len(sys.argv) < 2:
-    sys.exit("Usage: python3 scripts/check.py <Meitou release folder> [--generate]")
+    sys.exit("Usage: python3 scripts/check.py <Meitou release folder> [--ui-root <Kenshi folder>] [--generate]")
 runtime = Path(sys.argv[1]).resolve(strict=True)
 subprocess.run([
     "dotnet", "build", str(repo / "checks/KOChecks.csproj"), "-c", "Release",
@@ -36,7 +36,8 @@ with tempfile.TemporaryDirectory(prefix="kenshiorigins-runtime-") as temporary:
     shutil.copy2(runtime / "MeitouClient.runtimeconfig.json", run / "KOChecks.runtimeconfig.json")
     deps = json.loads((runtime / "MeitouClient.deps.json").read_text())
     target = deps["targets"][deps["runtimeTarget"]["name"]]
-    for name, version in (("KOChecks", "1.0.0"), ("KenshiOrigins", "0.1.0")):
+    mod_version = json.loads((repo / "meitou.json").read_text())["version"]
+    for name, version in (("KOChecks", "1.0.0"), ("KenshiOrigins", mod_version)):
         key = f"{name}/{version}"
         target[key] = {"runtime": {f"{name}.dll": {}}}
         deps["libraries"][key] = {"type": "project", "serviceable": False, "sha512": ""}
@@ -46,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix="kenshiorigins-runtime-") as temporary:
     if "--generate" not in sys.argv:
         # A game-supplied (TPA) DLL is deliberately refused as a mod. Retest loading with
         # our assembly absent from that list, just as in an actual Meitou installation.
-        del target["KenshiOrigins/0.1.0"]
-        del deps["libraries"]["KenshiOrigins/0.1.0"]
+        del target[f"KenshiOrigins/{mod_version}"]
+        del deps["libraries"][f"KenshiOrigins/{mod_version}"]
         (run / "KOChecks.deps.json").write_text(json.dumps(deps))
         subprocess.run([str(run / "KOChecks"), str(repo), "--loader"], env=environment, check=True)

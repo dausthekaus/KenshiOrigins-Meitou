@@ -16,36 +16,23 @@ namespace KenshiOrigins;
 /// <summary>Version-specific UI bridges. Rendering uses editor drafts or published views, never live character stats.</summary>
 internal static class OriginUi
 {
-    private static OriginCatalog s_catalog = null!;
     private static Action<string> s_log = null!;
-    private static FieldInfo s_session = null!, s_editor = null!, s_editorPlayer = null!, s_statsPlayer = null!;
-    private static FieldInfo s_width = null!, s_height = null!;
-    private static PropertyInfo s_current = null!, s_kind = null!;
-    private static MethodInfo s_draft = null!, s_selected = null!, s_publishPaused = null!;
+    private static FieldInfo s_session = null!, s_statsPlayer = null!;
+    private static MethodInfo s_selected = null!, s_publishPaused = null!;
     private static readonly ConditionalWeakTable<World, object> PausedFaults = new();
 
     internal static void Install(Harmony harmony, OriginCatalog catalog, Action<string> log)
     {
-        s_catalog = catalog;
         s_log = log;
         var game = typeof(IMod).Assembly;
         var player = game.GetType("Meitou.Game.PlayerInterface", throwOnError: true)!;
-        var editor = game.GetType("Meitou.Game.Editor.CharacterEditorPanel", throwOnError: true)!;
         var stats = game.GetType("Meitou.Game.Ui.StatsWindow", throwOnError: true)!;
         s_session = RequireField(player, "Session", typeof(WorldSession));
-        s_width = RequireField(player, "Width", typeof(int));
-        s_height = RequireField(player, "Height", typeof(int));
-        s_editor = AccessTools.DeclaredField(editor, "Editor") ?? throw new MissingFieldException(editor.FullName, "Editor");
-        s_editorPlayer = OwnerField(editor, player);
         s_statsPlayer = OwnerField(stats, player);
-        s_current = RequireProperty(s_editor.FieldType, "Current", typeof(CharacterId));
-        s_kind = RequireProperty(s_editor.FieldType, "Kind", typeof(EditKind));
-        s_draft = RequireMethod(editor, "Draft", typeof(CharacterId));
         s_selected = RequireMethod(player, "Selected");
         s_publishPaused = RequireMethod(typeof(World), "PublishPaused");
 
-        harmony.Patch(RequireMethod(editor, "AddEditorContent", typeof(List<UiControl>)),
-            postfix: new HarmonyMethod(typeof(OriginUi), nameof(EditorPreview)));
+        OriginCreationPanel.Install(harmony, catalog, log);
         harmony.Patch(RequireMethod(stats, "AddStatsContent", typeof(List<UiControl>)),
             postfix: new HarmonyMethod(typeof(OriginUi), nameof(StatsContent)));
         harmony.Patch(RequireMethod(typeof(World), nameof(World.ApplyPausedInterfaceCommands)),
@@ -79,12 +66,6 @@ internal static class OriginUi
         return field?.FieldType == expected ? field : throw new MissingFieldException(type.FullName, name);
     }
 
-    private static PropertyInfo RequireProperty(Type type, string name, Type expected)
-    {
-        var property = AccessTools.Property(type, name);
-        return property?.PropertyType == expected ? property : throw new MissingMemberException(type.FullName, name);
-    }
-
     private static FieldInfo OwnerField(Type container, Type player) => container.GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
         .Single(f => f.FieldType == player);
 
@@ -106,35 +87,6 @@ internal static class OriginUi
             PausedFaults.Add(__instance, new object());
             s_log($"Paused origin update stopped: {e.GetBaseException().Message}");
         }
-    }
-
-    private static void EditorPreview(object __instance, List<UiControl> controls)
-    {
-        var opening = s_editor.GetValue(__instance);
-        if (opening is null || s_kind.GetValue(opening) is not EditKind.Creation) return;
-        var player = s_editorPlayer.GetValue(__instance)!;
-        if (s_session.GetValue(player) is not WorldSession session) return;
-        var system = session.World.Systems.OfType<OriginSystem>().FirstOrDefault();
-        if (system is null) return;
-
-        var id = (CharacterId)s_current.GetValue(opening)!;
-        OriginView? view = null;
-        if (s_draft.Invoke(__instance, [id]) is CharacterDraft draft)
-        {
-            var origin = s_catalog.All[system.ReadChoice(draft.Record)];
-            view = new OriginView(origin.Name, origin.Description, origin.BonusSummary, true);
-        }
-        else if (system.Views.TryGetValue(id, out var pending)) view = pending;
-        if (view is null) return;
-
-        float width = (int)s_width.GetValue(player)!, height = (int)s_height.GetValue(player)!;
-        float left = controls.FirstOrDefault(c => c.Name == "NamePanel")?.Bounds is { } names ? names.X + names.Width : width * .162f;
-        float right = controls.FirstOrDefault(c => c.Name == "TabsPanel")?.Bounds.X ?? width * .7f;
-        float boxWidth = Math.Min(420, right - left - 16);
-        if (boxWidth < 160 || height < 300) return;
-        var box = new UiRect(left + (right - left - boxWidth) / 2, height - 228, boxWidth, 112);
-        AddText(controls, "preview", box, $"Origin: {view.Name}\n{view.Bonuses}\n{view.Description}\nBonuses apply after Confirm.", 14,
-            new Vector4(.07f, .065f, .05f, .9f));
     }
 
     private static void StatsContent(object __instance, List<UiControl> controls)

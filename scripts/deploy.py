@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -48,7 +49,8 @@ def replace_file(path, contents):
         pending.unlink(missing_ok=True)
 
 
-with zipfile.ZipFile(repo / "artifacts/KenshiOrigins-0.1.0.zip") as archive:
+version = json.loads((repo / "meitou.json").read_text())["version"]
+with zipfile.ZipFile(repo / f"artifacts/KenshiOrigins-{version}.zip") as archive:
     for member in archive.infolist():
         parts = Path(member.filename).parts
         if len(parts) != 2 or parts[0] != "KenshiOrigins" or member.is_dir():

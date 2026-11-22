@@ -24,6 +24,8 @@ internal static class PrototypeChecks
     internal static void Run(string[] args)
     {
         string repo = Path.GetFullPath(args[0]);
+        int uiArgument = Array.IndexOf(args, "--ui-root");
+        string? uiRoot = uiArgument >= 0 ? args[uiArgument + 1] : GameInstall.Locate()?.Root;
         if (args.Contains("--generate"))
         {
             WriteMod(Path.Combine(repo, "KenshiOrigins.mod"), "Character origins for MeitouClient.");
@@ -41,6 +43,7 @@ internal static class PrototypeChecks
         records.Records.Add(new FcsRecord { StringId = "204-gamedata.base", Name = "Nameless", RecordType = FcsRecordType.Faction });
         records.Records.Add(new FcsRecord { StringId = "race", Name = "Human", RecordType = FcsRecordType.Race });
         records.Records.Add(new FcsRecord { StringId = "race2", Name = "Another race", RecordType = FcsRecordType.Race });
+        records.Records.Single(r => r.StringId == "race").Strings["description"] = "The original race description.";
         records.Records.Add(new FcsRecord { StringId = "hero", Name = "Hero", RecordType = FcsRecordType.Character });
         db.Apply(records, "fixtures.mod");
 
@@ -233,7 +236,6 @@ internal static class PrototypeChecks
             draft.Record.Ints[key] = 2;
             draft.SetRace(db.Find("race")!, 8);
             Check(draft.Record.Ints[key] == 2, "returning to a cached race look preserves the latest origin choice");
-            ModLooks.AddRows(OriginsMod.Id, _ => [LookRow.Choice(EditorTab.Body, OriginSystem.ChoiceKey, "Origin", catalog.All.Select(o => o.Name).ToArray())]);
             draft.Reset();
             Check(draft.Record.Ints[key] == 2, "appearance Reset does not reset the origin choice");
 
@@ -247,10 +249,7 @@ internal static class PrototypeChecks
             ((Dictionary<CharacterId, CharacterDraft>)AccessTools.Property(openingType, "Drafts").GetValue(opening)!)[id] = draft;
             AccessTools.Field(playerType, "Width").SetValue(player, 1280);
             AccessTools.Field(playerType, "Height").SetValue(player, 900);
-            var preview = new List<UiControl>();
-            AccessTools.Method(editorType, "AddEditorContent").Invoke(editor, [preview]);
-            Check(preview.Single(c => c.Name == "kenshiorigins.preview").Caption.Contains(catalog.All[2].BonusSummary),
-                "real editor content hook previews the current draft's selected bonuses");
+            CreationPanelChecks.Run(catalog, db, session, player, editor, draft, id, uiRoot, Check);
             harmony.UnpatchAll(harmony.Id);
         }
 

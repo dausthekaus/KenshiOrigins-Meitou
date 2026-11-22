@@ -1,6 +1,6 @@
 {
   "id": "kenshiorigins",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "apiVersion": 3,
   "gameVersion": ">=0.22.2 <0.22.3",
   "assemblies": ["KenshiOrigins.dll"],

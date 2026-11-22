@@ -2,7 +2,9 @@
 
 C# code mod for **MeitouClient 0.22.2-nightly.20261122.2**. It gives each player character an origin with small additive stat bonuses.
 
-Start a new game and find **Origin** at the end of the character editor's **BODY** controls. Each starter has a random default you can change. A preview shows the selected origin and bonuses; bonuses apply after **CONFIRM**. The stats window shows the assigned origin beneath the attributes.
+Start a new game and use **Race / Origin** in the existing left description panel. **Origin** opens by default and contains a dropdown, the origin's description and its bonuses. **Race** restores the original race description. Each starter has a random default you can change.
+
+Selecting an origin immediately keeps it in that character's creation draft; there is no extra Apply or Save button. Switching characters, changing appearance or switching the information view preserves the choice. **CONFIRM** finishes creation and applies bonuses; normal game saves persist the assignment. The stats window shows the assigned origin beneath the attributes.
 
 Later recruits and characters added directly to player squads receive a random origin. Moving between squads, dismissal and re-recruitment keep the assignment. The system examines the actual roster, so it does not rely on specific vanilla Game Starts.
 
@@ -15,7 +17,7 @@ dotnet build KenshiOrigins.csproj -c Release
 python3 scripts/package.py
 ```
 
-Extract `artifacts/KenshiOrigins-0.1.0.zip` into your **Kenshi installation's `mods` directory**. Enable KenshiOrigins in the launcher and restart the client. Keep `KenshiOrigins.mod`, `meitou.json`, `KenshiOrigins.dll` and `originform.json` together in `mods/KenshiOrigins/`.
+Extract `artifacts/KenshiOrigins-0.1.2.zip` into your **Kenshi installation's `mods` directory**. Enable KenshiOrigins in the launcher and restart the client. Keep `KenshiOrigins.mod`, `meitou.json`, `KenshiOrigins.dll` and `originform.json` together in `mods/KenshiOrigins/`.
 
 The package script also creates `artifacts/ExtraOrigins-example.zip`. Extract it into the same `mods` directory and enable it after KenshiOrigins to try the sample Dockworker origin. Neither ZIP includes game DLLs.
 
@@ -57,11 +59,12 @@ Keep IDs stable and use your pack's prefix. Stat keys are names from Meitou's `S
 
 ## Read the code
 
-- `src/OriginsMod.cs`: the entry point. Registers the editor choice, world system and narrow Harmony hooks.
+- `src/OriginsMod.cs`: the entry point. Registers the world system and narrow Harmony hooks.
 - `src/OriginCatalog.cs`: finds dependent packs and validates their JSON. Content loading stays separate from gameplay.
 - `src/OriginDefinition.cs`: describes an origin without putting character-specific state in it.
 - `src/OriginSystem.cs`: remembers the starting roster, waits for creation to finish, assigns origins and restores modifiers. The save stores stable origin IDs against the engine's lasting character IDs.
-- `src/OriginUi.cs`: keeps rendering separate from gameplay. Previews use editor drafts; stats labels use published copies. Hooks preserve the chosen origin across cached race/gender looks, appearance reset/import, and handle recruitment or confirmation while paused.
+- `src/OriginCreationPanel.cs`: extends the existing description area with Race/Origin buttons and a native dropdown. Each selection updates the current draft through the engine's setter, so Confirm includes it.
+- `src/OriginUi.cs`: displays assigned origins in stats. Hooks preserve the chosen origin across cached race/gender looks, appearance reset/import, and handle recruitment or confirmation while paused.
 
 Bonuses use one named modifier source. Setting that source replaces its previous amount, so repeated updates do not stack bonuses. Trained stats remain unchanged. Modifiers are rebuilt from the saved origin ID after loading.
 
@@ -74,6 +77,8 @@ python3 scripts/check.py /path/to/Meitou/versions/0.22.2-nightly.20261122.2
 ```
 
 They exercise dependent-pack discovery, validation, multiple starting squads, deferred bonuses, replacement stats, recruits, persistence with changed runtime IDs, missing definitions, paused confirmation, real editor/stats hooks, deterministic hashes and the real mod loader in an isolated process. They use synthetic game data and do not modify the installed game or saves.
+
+Pass `--ui-root /path/to/Kenshi` to exercise the installed native editor layout and templates as well: mouse/keyboard dropdown selection, automatic draft saving, character/view switching and panel bounds at three resolutions. These checks use the game's screen router, including its disabled-by-default button bindings, and read GUI assets without copying them into the project.
 
 To regenerate the two empty `.mod` headers using Meitou's own writer:
 
