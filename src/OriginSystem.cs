@@ -72,15 +72,17 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
                     continue;
                 }
 
-                int choice = _startingChoices.TryGetValue(id, out int initial)
-                    ? ReadChoice(cold.Appearance?.Loadout?.Appearance.Record, initial) : RandomChoice(world, id);
+                bool isStarter = _startingChoices.TryGetValue(id, out int initial);
+                int choice = isStarter ? ReadChoice(cold.Appearance?.Loadout?.Appearance.Record, initial) : RandomChoice(world, id);
                 if (choice == catalog.All.Count) choice = RandomChoice(world, id);
                 var origin = catalog.All[choice];
                 originId = origin.Id;
                 var lasting = world.LastingIds.GetOrGive(id);
                 if (lasting.IsNone) continue;
                 _assignments.Add(lasting, originId);
-                if (origin.Items.Count > 0) _pendingItems[lasting] = origin.Items.ToArray();
+                // Membership was captured at new-game Ready, before the editor. Later recruits
+                // still get an origin and bonuses, but cannot create a starting-equipment queue.
+                if (isStarter && origin.Items.Count > 0) _pendingItems[lasting] = origin.Items.ToArray();
                 _startingChoices.Remove(id);
                 log($"Assigned {origin.Name} to {cold.Name} ({lasting}).");
                 changed = true;
@@ -168,8 +170,9 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
             if (entry is null || entry.Character == 0 || string.IsNullOrWhiteSpace(entry.OriginId)
                 || !restored.TryAdd(new LastingId(entry.Character), entry.OriginId))
                 throw new InvalidDataException("Invalid or duplicate origin assignment in save data.");
-            // Version 1 predates equipment. Give those characters their first grant exactly once.
-            var grants = saved.FormatVersion == 1 ? catalog.Find(entry.OriginId)?.Items.ToArray() ?? []
+            // Version 1 has no roster provenance: do not invent equipment grants on load.
+            // Version 2 queues already record outstanding deliveries and resume as saved.
+            var grants = saved.FormatVersion == 1 ? []
                 : entry.PendingItems ?? throw new InvalidDataException("Missing pending origin items in save data.");
             if (grants.Any(item => item is null || string.IsNullOrWhiteSpace(item.Record)
                 || item.Quantity is < 1 or > 1000 || item.Quality is < 0 or > 100))

@@ -20,9 +20,9 @@ The standalone pool gives each origin eight bonus points in total:
 | Gunner | +5 Crossbows, +3 Turrets | Tooth Pick and 2 packs of matching bolts |
 | Assassin | +5 Assassination, +3 Stealth | Wakizashi |
 
-Items go into the main inventory or an existing backpack's storage. They are never equipped, never replace custom-start equipment, and are never dropped on the ground. Anything that does not fit remains in a saved queue and is retried when space opens up. The stats description reports the number of pending items. Removing, selling or consuming delivered items never grants replacements.
+Only characters in the initial Game Start roster receive starting items, after character creation is confirmed. The roster is captured from all player squads when a new world becomes ready, so custom Game Starts and multiple starting squads work without matching any start or squad names. Items go into the main inventory or an existing backpack's storage. They are never equipped, never replace custom-start equipment, and are never dropped on the ground. Anything that does not fit remains in a saved queue and is retried when space opens up. The stats description reports the number of pending items. Removing, selling or consuming delivered items never grants replacements.
 
-Later recruits and characters added directly to player squads receive a random origin. Moving between squads, dismissal and re-recruitment keep the assignment. The system examines the actual roster, so it does not rely on specific vanilla Game Starts.
+Later recruits and characters added directly to player squads receive a random origin and its stat bonuses, but no starting equipment or equipment queue. This also applies to player characters added after the initial roster capture while the creation screen is still open. Moving between squads, dismissal and re-recruitment keep the assignment and do not create equipment grants.
 
 ## Build and install
 
@@ -33,7 +33,7 @@ dotnet build KenshiOrigins.csproj -c Release
 python3 scripts/package.py
 ```
 
-Extract `artifacts/KenshiOrigins-0.2.0.zip` into your **Kenshi installation's `mods` directory**. Enable KenshiOrigins in the launcher and restart the client. Keep `KenshiOrigins.mod`, `meitou.json`, `KenshiOrigins.dll` and `originform.json` together in `mods/KenshiOrigins/`.
+Extract `artifacts/KenshiOrigins-0.2.1.zip` into your **Kenshi installation's `mods` directory**. Enable KenshiOrigins in the launcher and restart the client. Keep `KenshiOrigins.mod`, `meitou.json`, `KenshiOrigins.dll` and `originform.json` together in `mods/KenshiOrigins/`.
 
 The package script also creates `artifacts/ExtraOrigins-example.zip`. Extract it into the same `mods` directory and enable it after KenshiOrigins to try the sample Dockworker origin. Neither ZIP includes game DLLs.
 
@@ -79,7 +79,7 @@ Keep IDs stable and use your pack's prefix. Stat keys are names from Meitou's `S
 
 `difficulty` is optional free text, displayed in creation and stats without affecting gameplay. It defaults to `Unrated`; the bundled `Easy` / `Standard` labels describe the relative starting challenge and can be rewritten freely. `items` is optional and defaults to an empty list, so existing packs continue to work. An item's `record` is its stable FCS record ID, not its display name. The `-otto.mod` suffix in a vanilla ID is part of that ID; it does not mean a separate mod must be installed. Quantity defaults to 1 (range 1–1000); quality defaults to 0 (range 0–100). Weapon quality uses the engine's craft-grade lookup; crossbows, armour and limbs use their level. Ordinary items keep their record-defined quality. For ammunition, quantity counts inventory items/packs rather than individual shots. Missing or unsupported item records are logged and skipped while valid grants continue.
 
-Equipment is queued once when an origin is assigned, including later recruits. Delivered quantities and outstanding quantities persist with the character's lasting ID. Saves from v0.1.x receive their first equipment grant when loaded by this version; save normally to preserve completion. Later edits to an origin's item list do not grant another set to an already assigned character. The JSON content format stays at version 1; the internal save format is now version 2.
+Equipment is queued once when an initial-roster character's origin is finalized. `OriginSystem` reuses its existing `_startingChoices` roster to make that decision before removing the temporary entry; no extra roster state is introduced. Delivered quantities and outstanding quantities persist with the character's lasting ID. Existing version-2 equipment queues resume exactly as saved, including queues written by v0.2.0, whose saves do not distinguish starters from recruits. No new grants are inferred on load. Version-1 saves from v0.1.x keep their origins and bonuses but receive no retroactive equipment, because they do not identify the initial roster. Installing on an existing save likewise grants origins and bonuses only. Later edits to an origin's item list do not grant another set to an already assigned character. The JSON content format stays at version 1; the internal save format stays at version 2.
 
 ## Read the code
 
@@ -101,7 +101,7 @@ On Linux, run the headless checks with the release's own bundled runtime and Har
 python3 scripts/check.py /path/to/Meitou/versions/0.22.2-nightly.20261122.2
 ```
 
-They exercise dependent-pack discovery, validation, multiple starting squads, deferred bonuses/items, partial inventory delivery, backpack storage, save migration, replacement stats, recruits, persistence with changed runtime IDs, missing definitions, paused confirmation, real editor/stats hooks, deterministic hashes and the real mod loader in an isolated process. They use synthetic game data and do not modify the installed game or saves.
+They exercise dependent-pack discovery, validation, multiple custom starting squads, deferred starter equipment, recruits and later player spawns receiving bonuses without gear, partial inventory delivery, backpack storage, save migration, replacement stats, persistence with changed runtime IDs, missing definitions, paused confirmation, real editor/stats hooks, deterministic hashes and the real mod loader in an isolated process. They use synthetic game data and do not modify the installed game or saves.
 
 Pass `--ui-root /path/to/Kenshi` to exercise the installed native editor layout and templates as well: mouse/keyboard dropdown selection including Random, automatic draft saving, character/view switching, difficulty labels, scrolling and panel bounds at three resolutions. It also checks all bundled item IDs against the installed vanilla database and verifies the Gunner's ammunition. These checks use the game's screen router, including its disabled-by-default button bindings, and read assets without copying them into the project.
 

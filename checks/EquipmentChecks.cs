@@ -8,6 +8,7 @@ using Meitou.Data.Gameplay.Bodies;
 using Meitou.Simulation;
 using Meitou.Simulation.Bodies;
 using Meitou.Simulation.Items;
+using Meitou.Simulation.Factions;
 
 internal static class EquipmentChecks
 {
@@ -23,13 +24,29 @@ internal static class EquipmentChecks
         var factory = new ItemFactory(db, GameConstants.Default);
         var logs = new List<string>();
         OriginCatalog Catalog(params OriginItem[] items) => new([new OriginDefinition("test.origin", "Test", "Test story",
-            new Dictionary<StatsEnumerated, float>(), Array.AsReadOnly(items), "Challenging")]);
+            new Dictionary<StatsEnumerated, float> { [StatsEnumerated.Strength] = 2 }, Array.AsReadOnly(items), "Challenging")]);
         var catalog = Catalog(new("test.weapon", 1, 15), new("test.supply", 7, 0));
         OriginSystem System(OriginCatalog? pool = null) => new(pool ?? catalog, RngPurpose.Test, logs.Add, factory);
-        World MakeWorld(OriginSystem system) => new(new WorldSettings { Seed = 45, PublishSnapshots = false },
-            new OpenGroundWalkability((_, _) => 0), [system]);
-        CharacterId Spawn(World world, Inventory? inventory, bool player = true) => world.Characters.Spawn(new CharacterHot { Health = 100 },
-            new CharacterCold { Name = "Equipment test", IsPlayer = player, Stats = new CharacterStats(), Inventory = inventory }, 0);
+        World MakeWorld(OriginSystem system)
+        {
+            var world = new World(new WorldSettings { Seed = 45, PublishSnapshots = false },
+                new OpenGroundWalkability((_, _) => 0), [system]);
+            world.Player.Faction = 0;
+            return world;
+        }
+        CharacterId Spawn(World world, Inventory? inventory, bool player = true)
+        {
+            // A start may put characters in multiple custom squads, not just one named template.
+            var squad = new Squad { Id = world.Squads.NextId(), TemplateId = "custom-start-squad", Faction = player ? 0 : 1,
+                HomeCentre = Vector2.Zero, HomeRadius = 10 };
+            world.Squads.Add(squad);
+            var id = world.Characters.Spawn(new CharacterHot { Health = 100 },
+                new CharacterCold { Name = "Equipment test", IsPlayer = player, SquadId = squad.Id, Faction = squad.Faction,
+                    Stats = new CharacterStats(), Inventory = inventory }, 0);
+            squad.Members.Add(id);
+            squad.Leader = id;
+            return id;
+        }
         static CharacterCold Cold(World world, CharacterId id) => world.Characters.Cold(id.Slot)!;
         static byte[] Save(OriginSystem system)
         {
@@ -51,9 +68,14 @@ internal static class EquipmentChecks
         worn.Section = "back";
         inventory.Items.Add(worn);
         var id = Spawn(world, inventory);
+        var secondStarter = Spawn(world, new Inventory());
+        var recruit = Spawn(world, new Inventory(), false);
         world.Player.InCreation = true;
         origin.Ready(world, false);
-        check(inventory.Items.Count == 1, "origin gear is not granted while character creation is open");
+        check(inventory.Items.Count == 1 && Cold(world, secondStarter).Inventory!.Items.Count == 0,
+            "initial-roster equipment waits until character creation is confirmed");
+        var addedDuringCreation = Spawn(world, new Inventory());
+        origin.Reconcile(world);
         world.Player.InCreation = false;
         origin.Reconcile(world);
         check(inventory.Items.Contains(worn) && worn.Section == "back"
@@ -62,6 +84,27 @@ internal static class EquipmentChecks
         check(inventory.Items.Where(i => i.Record == "test.supply").Sum(i => i.Quantity) == 7
             && inventory.Items.Single(i => i.Record == "test.weapon" && i.Section == "main").Level == 15,
             "JSON quantities and weapon quality reach the inventory");
+        check(Cold(world, secondStarter).Inventory!.Items.Where(i => i.Record == "test.supply").Sum(i => i.Quantity) == 7,
+            "initial starters in another modded squad receive their starting equipment");
+        check(origin.Views.ContainsKey(addedDuringCreation) && Cold(world, addedDuringCreation).Stats!.Strength == 3
+            && Cold(world, addedDuringCreation).Inventory!.Items.Count == 0 && origin.Views[addedDuringCreation].ItemsWaiting == 0,
+            "a player character added after initial capture gets an origin and bonuses without equipment");
+        Cold(world, recruit).IsPlayer = true;
+        origin.Reconcile(world);
+        check(origin.Views[recruit].Name == "Test" && Cold(world, recruit).Stats!.Strength == 3
+            && Cold(world, recruit).Inventory!.Items.Count == 0 && origin.Views[recruit].ItemsWaiting == 0,
+            "later recruitment assigns an origin and stat bonuses without creating an equipment queue");
+        Cold(world, recruit).IsPlayer = false;
+        origin.Reconcile(world);
+        Cold(world, recruit).IsPlayer = true;
+        origin.Reconcile(world);
+        check(Cold(world, recruit).Inventory!.Items.Count == 0 && origin.Views[recruit].ItemsWaiting == 0,
+            "dismissal and re-recruitment cannot turn a later recruit into a starter");
+        var lateSpawn = Spawn(world, new Inventory());
+        origin.Reconcile(world);
+        check(origin.Views.ContainsKey(lateSpawn) && Cold(world, lateSpawn).Stats!.Strength == 3
+            && Cold(world, lateSpawn).Inventory!.Items.Count == 0 && origin.Views[lateSpawn].ItemsWaiting == 0,
+            "direct player spawns after creation also receive no starting equipment");
         origin.Reconcile(world);
         Cold(world, id).IsPlayer = false;
         origin.Reconcile(world);
@@ -78,6 +121,12 @@ internal static class EquipmentChecks
         restored.Ready(loaded, true);
         check(Cold(loaded, same).Inventory!.Items.Where(i => i.Record == "test.supply").Sum(i => i.Quantity) == 7,
             "saving and loading with changed runtime IDs cannot grant equipment twice");
+        var loadedRecruit = Spawn(loaded, new Inventory());
+        Lasting(Cold(loaded, loadedRecruit), Cold(world, recruit).LastingId);
+        restored.Reconcile(loaded);
+        check(Cold(loaded, loadedRecruit).Stats!.Strength == 3 && Cold(loaded, loadedRecruit).Inventory!.Items.Count == 0
+            && restored.Views[loadedRecruit].ItemsWaiting == 0,
+            "a saved later recruit keeps bonuses and never acquires starting gear on load");
 
         var supplies = Catalog(new OriginItem("test.supply", 7, 0));
         var partial = System(supplies);
@@ -140,13 +189,22 @@ internal static class EquipmentChecks
         var legacyId = Spawn(legacyWorld, new Inventory());
         Lasting(Cold(legacyWorld, legacyId), new LastingId(400));
         legacy.Ready(legacyWorld, true);
-        check(Cold(legacyWorld, legacyId).Inventory!.Items.Sum(i => i.Quantity) == 7,
-            "pre-equipment version-1 saves receive their first grant during migration");
+        check(Cold(legacyWorld, legacyId).Stats!.Strength == 3 && Cold(legacyWorld, legacyId).Inventory!.Items.Count == 0
+            && legacy.Views[legacyId].ItemsWaiting == 0,
+            "version-1 migration keeps origins and bonuses without inventing starter eligibility");
         var migrated = System(supplies);
         Restore(migrated, Save(legacy));
         migrated.Reconcile(legacyWorld);
-        check(Cold(legacyWorld, legacyId).Inventory!.Items.Sum(i => i.Quantity) == 7,
-            "migrated equipment completion persists in version-2 saves");
+        check(Cold(legacyWorld, legacyId).Inventory!.Items.Count == 0 && migrated.Views[legacyId].ItemsWaiting == 0,
+            "saving migrated assignments cannot create new equipment grants");
+
+        var installedLater = System(supplies);
+        using var existingWorld = MakeWorld(installedLater);
+        var existingPlayer = Spawn(existingWorld, new Inventory());
+        installedLater.Ready(existingWorld, true);
+        check(installedLater.Views.ContainsKey(existingPlayer) && Cold(existingWorld, existingPlayer).Stats!.Strength == 3
+            && Cold(existingWorld, existingPlayer).Inventory!.Items.Count == 0 && installedLater.Views[existingPlayer].ItemsWaiting == 0,
+            "installing on an existing save assigns origins and bonuses without assuming a new-game roster");
 
         var hashBefore = new StateHasher();
         partial.Hash(ref hashBefore);
