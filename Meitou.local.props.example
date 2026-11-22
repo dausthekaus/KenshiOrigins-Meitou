@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <MeitouDirectory>/path/to/Meitou/versions/0.22.2-nightly.20261122.2</MeitouDirectory>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,29 @@
+{
+  "formatVersion": 1,
+  "origins": [
+    {
+      "id": "kenshiorigins.farmhand",
+      "name": "Farmhand",
+      "description": "Years in the fields built strength and a feel for growing crops.",
+      "bonuses": { "Strength": 2, "Farming": 3 }
+    },
+    {
+      "id": "kenshiorigins.wanderer",
+      "name": "Wanderer",
+      "description": "Long journeys taught you to travel light and keep moving.",
+      "bonuses": { "Athletics": 3, "Swimming": 2 }
+    },
+    {
+      "id": "kenshiorigins.apprentice",
+      "name": "Apprentice",
+      "description": "Workshop errands gave you a little practical knowledge.",
+      "bonuses": { "Engineering": 2, "Science": 2 }
+    },
+    {
+      "id": "kenshiorigins.streeturchin",
+      "name": "Street Urchin",
+      "description": "Keeping out of sight was often the easiest way to survive.",
+      "bonuses": { "Stealth": 3, "Thieving": 2 }
+    }
+  ]
+}

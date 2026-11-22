@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="Meitou.local.props" Condition="Exists('Meitou.local.props')" />
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <AssemblyName>KenshiOrigins</AssemblyName>
+    <Version>0.1.0</Version>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="src/**/*.cs" />
+    <!-- The running game supplies these DLLs; never bundle copies with the mod. -->
+    <Reference Include="MeitouClient" HintPath="$(MeitouDirectory)/MeitouClient.dll" Private="false" />
+    <Reference Include="Meitou.Simulation" HintPath="$(MeitouDirectory)/Meitou.Simulation.dll" Private="false" />
+    <Reference Include="Meitou.Data" HintPath="$(MeitouDirectory)/Meitou.Data.dll" Private="false" />
+    <Reference Include="Meitou.Core" HintPath="$(MeitouDirectory)/Meitou.Core.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(MeitouDirectory)/0Harmony.dll" Private="false" />
+    <None Update="meitou.json;originform.json;KenshiOrigins.mod" CopyToOutputDirectory="PreserveNewest" />
+    <InternalsVisibleTo Include="KOChecks" />
+  </ItemGroup>
+  <Target Name="CheckMeitouDirectory" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(MeitouDirectory)/MeitouClient.dll')"
+           Text="Set MeitouDirectory to the extracted 0.22.2-nightly.20261122.2 folder. See Meitou.local.props.example." />
+  </Target>
+</Project>

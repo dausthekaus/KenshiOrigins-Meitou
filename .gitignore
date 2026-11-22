@@ -1,0 +1,6 @@
+bin/
+obj/
+artifacts/
+Meitou.local.props
+**/bin/
+**/obj/

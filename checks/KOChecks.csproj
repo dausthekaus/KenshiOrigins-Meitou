@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../Meitou.local.props" Condition="Exists('../Meitou.local.props')" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>KOChecks</AssemblyName>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KenshiOrigins.csproj" />
+    <Reference Include="$(MeitouDirectory)/*.dll"
+               Exclude="$(MeitouDirectory)/System.*.dll;$(MeitouDirectory)/Microsoft.*.dll;$(MeitouDirectory)/mscorlib.dll;$(MeitouDirectory)/netstandard.dll;$(MeitouDirectory)/WindowsBase.dll" />
+  </ItemGroup>
+</Project>
