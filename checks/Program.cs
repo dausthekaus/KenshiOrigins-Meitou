@@ -8,6 +8,7 @@ using Meitou.Data;
 using Meitou.Data.Characters;
 using Meitou.Data.Fcs;
 using Meitou.Data.Gameplay.Bodies;
+using Meitou.Data.Gameplay;
 using Meitou.Data.Ui;
 using Meitou.Game.Host;
 using Meitou.Game.Ui;
@@ -16,6 +17,7 @@ using Meitou.Simulation;
 using Meitou.Simulation.Bodies;
 using Meitou.Simulation.Editing;
 using Meitou.Simulation.Factions;
+using Meitou.Simulation.Items;
 using Meitou.Simulation.Player;
 using Meitou.Simulation.Population;
 
@@ -37,7 +39,7 @@ internal static class PrototypeChecks
         int assertions = 0;
         var logs = new List<string>();
         var catalog = new OriginCatalog(OriginCatalog.ReadFile(Path.Combine(repo, OriginCatalog.FileName)));
-        Check(catalog.All.Count == 4, "built-in definitions validate");
+        Check(catalog.All.Count == 7, "seven built-in definitions validate");
         var db = new GameDatabase();
         var records = new FcsFile();
         records.Records.Add(new FcsRecord { StringId = "204-gamedata.base", Name = "Nameless", RecordType = FcsRecordType.Faction });
@@ -45,6 +47,8 @@ internal static class PrototypeChecks
         records.Records.Add(new FcsRecord { StringId = "race2", Name = "Another race", RecordType = FcsRecordType.Race });
         records.Records.Single(r => r.StringId == "race").Strings["description"] = "The original race description.";
         records.Records.Add(new FcsRecord { StringId = "hero", Name = "Hero", RecordType = FcsRecordType.Character });
+        records.Records.Add(new FcsRecord { StringId = "475-gamedata.base", Name = "Horse Chopper", RecordType = FcsRecordType.Weapon });
+        records.Records.Add(new FcsRecord { StringId = "1020-gamedata.base", Name = "Wakizashi", RecordType = FcsRecordType.Weapon });
         db.Apply(records, "fixtures.mod");
 
         string scratch = Path.Combine(Path.GetTempPath(), "kenshiorigins-check-" + Guid.NewGuid().ToString("N"));
@@ -55,6 +59,8 @@ internal static class PrototypeChecks
             CheckDiscovery();
             CheckValidation();
             CheckLifecycle();
+            CheckCombatOrigins();
+            EquipmentChecks.Run(catalog, uiRoot, Check);
             CheckUi();
             Check(DeterministicHash(1) == DeterministicHash(4), "assignments and hashes agree with one and four worker threads");
             Console.WriteLine($"PASS: {assertions} assertions against {typeof(IMod).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion}.");
@@ -107,9 +113,15 @@ internal static class PrototypeChecks
                 valid.Replace("\"Strength\"", "\"Strenght\""),
                 valid.Replace("\"formatVersion\": 1", "\"formatVersion\": 99"),
                 valid.Replace("kenshiorigins.wanderer", "kenshiorigins.farmhand"),
-                valid.Replace("\"Strength\": 2", "\"Strength\": 2, \"UnknownField\": 1"),
-                valid.Replace("\"Strength\": 2", "\"None\": 2"),
-                valid.Replace("\"Strength\": 2", "\"Medic\": 2, \"Vet\": 1")
+                valid.Replace("\"Strength\": 3", "\"Strength\": 3, \"UnknownField\": 1"),
+                valid.Replace("\"Strength\": 3", "\"None\": 2"),
+                valid.Replace("\"Strength\": 3", "\"Medic\": 2, \"Vet\": 1"),
+                valid.Replace("\"quantity\": 1", "\"quantity\": 0"),
+                valid.Replace("\"quantity\": 1", "\"quantity\": 1001"),
+                valid.Replace("\"quality\": 0", "\"quality\": -1"),
+                valid.Replace("\"quality\": 0", "\"quality\": 101"),
+                valid.Replace("2064-gamedata.base", " "),
+                valid.Replace("\"difficulty\": \"Standard\"", "\"difficulty\": 3")
             })
             {
                 File.WriteAllText(path, text);
@@ -122,6 +134,8 @@ internal static class PrototypeChecks
             var pool = catalog.All.ToList();
             OriginCatalog.AddPack(pool, invalid, logs.Add);
             Check(pool.Count == catalog.All.Count, "duplicate pack IDs cannot overwrite existing definitions");
+            var oldPack = OriginCatalog.ReadFile(Path.Combine(repo, "examples/ExtraOrigins/originform.json")).Single();
+            Check(oldPack.Items.Count == 0 && oldPack.Difficulty == "Unrated", "existing packs can omit items and difficulty");
         }
 
         void CheckLifecycle()
@@ -144,10 +158,10 @@ internal static class PrototypeChecks
             world.Player.InCreation = false;
             system.Reconcile(world);
             Check(system.Views[starter].Name == "Farmhand", "confirmed choice wins over the random default");
-            Check(Cold(world, starter).Stats!.Strength == 3, "bonus applies to replacement stats after creation");
+            Check(Cold(world, starter).Stats!.Strength == 4, "bonus applies to replacement stats after creation");
             Check(Cold(world, starter).Stats!.Stored(StatsEnumerated.Strength) == 1, "origin bonus does not change trained stats");
             system.Reconcile(world);
-            Check(Cold(world, starter).Stats!.Strength == 3, "repeated reconciliation cannot stack the bonus");
+            Check(Cold(world, starter).Stats!.Strength == 4, "repeated reconciliation cannot stack the bonus");
 
             Cold(world, npc).IsPlayer = true;
             system.Reconcile(world);
@@ -172,9 +186,9 @@ internal static class PrototypeChecks
             typeof(CharacterCold).GetProperty("LastingId")!.SetValue(Cold(loaded, same), lasting);
             restored.Ready(loaded, true);
             Check(same != starter && restored.Views[same].Name == "Farmhand", "save data follows lasting ID across changed runtime IDs and names");
-            Check(Cold(loaded, same).Stats!.Strength == 3, "loading restores the modifier exactly once");
+            Check(Cold(loaded, same).Stats!.Strength == 4, "loading restores the modifier exactly once");
             restored.Reconcile(loaded);
-            Check(Cold(loaded, same).Stats!.Strength == 3, "loaded bonuses remain idempotent");
+            Check(Cold(loaded, same).Stats!.Strength == 4, "loaded bonuses remain idempotent");
 
             var withoutPack = new OriginSystem(new OriginCatalog(catalog.All.Where(o => o.Id != "kenshiorigins.farmhand")), RngPurpose.Test, logs.Add);
             withoutPack.Read(new MemoryStream(state));
@@ -190,25 +204,69 @@ internal static class PrototypeChecks
             var veteran = Spawn(oldSave, "Existing save", true);
             existing.Ready(oldSave, true);
             Check(existing.Views.ContainsKey(veteran), "installing on an existing save assigns a random origin");
+
+            var lucky = MakeSystem();
+            using var luckyWorld = MakeWorld(lucky);
+            var gambler = Spawn(luckyWorld, "Lucky starter", true);
+            luckyWorld.Player.InCreation = true;
+            lucky.Ready(luckyWorld, false);
+            string roll = lucky.Views[gambler].Name;
+            Cold(luckyWorld, gambler).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] = catalog.All.Count;
+            luckyWorld.Player.InCreation = false;
+            lucky.Reconcile(luckyWorld);
+            lucky.Reconcile(luckyWorld);
+            Check(lucky.Views[gambler].Name == roll && !lucky.Views[gambler].Pending,
+                "Random resolves to one deterministic real origin at confirmation and never rerolls on reconciliation");
+            using var luckySave = JsonDocument.Parse(Save(lucky));
+            Check(catalog.Find(luckySave.RootElement.GetProperty("Assignments")[0].GetProperty("OriginId").GetString()!) is not null,
+                "Random persists the resolved stable origin ID rather than a random placeholder");
+        }
+
+        void CheckCombatOrigins()
+        {
+            foreach (string originId in new[] { "kenshiorigins.soldier", "kenshiorigins.gunner", "kenshiorigins.assassin" })
+            {
+                var definition = catalog.Find(originId)!;
+                var system = MakeSystem();
+                using var world = MakeWorld(system);
+                var id = Spawn(world, definition.Name, true);
+                world.Player.InCreation = true;
+                system.Ready(world, false);
+                Cold(world, id).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] = catalog.IndexOf(originId);
+                world.Player.InCreation = false;
+                system.Reconcile(world);
+                Check(system.Views[id].Description == definition.Description && definition.Description.Length > 100,
+                    $"{definition.Name} publishes its full origin story after creation");
+                Check(definition.Bonuses.All(b => Math.Abs(Cold(world, id).Stats![b.Key] - (1 + b.Value)) < .001f),
+                    $"{definition.Name} applies its supported combat bonuses");
+            }
         }
 
         void CheckUi()
         {
             var harmony = new Harmony("kenshiorigins.checks");
             OriginUi.Install(harmony, catalog, logs.Add);
-            var system = MakeSystem();
+            var system = new OriginSystem(catalog, RngPurpose.Test, logs.Add, new ItemFactory(db, GameConstants.Default));
             using var session = new WorldSession(Vector3.Zero, (-100, -100, 100, 100), (_, _) => 0,
                 simulation: new WorldSettings { Seed = 918273 }, systems: [new PlayerSystem(), system]);
             var world = session.World;
             world.Player.Faction = 0;
             var id = Spawn(world, "Paused starter", true);
+            var companion = Spawn(world, "Assassin companion", true);
             world.Player.Selection.Add(id);
             world.Player.InCreation = true;
             world.TellReady(false);
+            Cold(world, id).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] =
+                catalog.IndexOf("kenshiorigins.soldier");
+            Cold(world, companion).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] =
+                catalog.IndexOf("kenshiorigins.assassin");
             world.Commands.Enqueue(new FinishCreation { Tick = world.Tick });
             world.ApplyPausedInterfaceCommands();
             Check(!world.Player.InCreation && !system.Views[id].Pending, "real paused FinishCreation triggers assignment through the Harmony bridge");
             Check(Cold(world, id).Stats!.Modifiers.All.Count > 0, "paused confirmation applies bonuses before unpausing");
+            Check(Cold(world, id).Inventory!.Items.Single().Record == "475-gamedata.base"
+                && Cold(world, id).Inventory!.Items.Single().Section == "main",
+                "real paused FinishCreation delivers starting gear into inventory before unpausing");
 
             var playerType = typeof(IMod).Assembly.GetType("Meitou.Game.PlayerInterface", true)!;
             var player = Activator.CreateInstance(playerType, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null,
@@ -223,7 +281,10 @@ internal static class PrototypeChecks
             };
             AccessTools.Method(statsType, "AddStatsContent").Invoke(stats, [controls]);
             Check(controls.Any(c => c.Name == "kenshiorigins.stats" && c.Caption.Contains(system.Views[id].Name)), "real stats content hook displays the selected character's origin");
-            Check(controls.Where(c => c.Name.StartsWith("kenshiorigins.")).All(c => c.Pickable == false), "origin labels do not intercept game controls");
+            Check(controls.Single(c => c.Name == "kenshiorigins.stats").Action == "stat:" + OriginUi.OriginStat,
+                "origin entry uses native stat selection to expose its story");
+            Check(controls.Where(c => c.Name.StartsWith("kenshiorigins.") && c.Name != "kenshiorigins.stats").All(c => c.Pickable == false),
+                "origin body text does not intercept game controls");
 
             string key = ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey);
             var draft = new CharacterDraft(db, scratch, Cold(world, id).Appearance!.Loadout!.Appearance.Record, "Draft") { Creation = true };
@@ -285,7 +346,7 @@ internal static class PrototypeChecks
             var cold = new CharacterCold
             {
                 Name = name, RecordId = "hero", IsPlayer = player, Faction = squad.Faction, SquadId = squad.Id,
-                Stats = new CharacterStats(), Appearance = appearance
+                Stats = new CharacterStats(), Appearance = appearance, Inventory = new Inventory()
             };
             var id = world.Characters.Spawn(new CharacterHot { Health = 100 }, cold, 0);
             squad.Members.Add(id);

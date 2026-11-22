@@ -5,25 +5,60 @@
       "id": "kenshiorigins.farmhand",
       "name": "Farmhand",
       "description": "Years in the fields built strength and a feel for growing crops.",
-      "bonuses": { "Strength": 2, "Farming": 3 }
+      "difficulty": "Standard",
+      "bonuses": { "Strength": 3, "Farming": 5 },
+      "items": [ { "record": "2064-gamedata.base", "quantity": 1, "quality": 0 } ]
     },
     {
       "id": "kenshiorigins.wanderer",
       "name": "Wanderer",
       "description": "Long journeys taught you to travel light and keep moving.",
-      "bonuses": { "Athletics": 3, "Swimming": 2 }
+      "difficulty": "Standard",
+      "bonuses": { "Athletics": 5, "Swimming": 3 },
+      "items": [ { "record": "42334-changes_otto.mod", "quantity": 2 } ]
     },
     {
       "id": "kenshiorigins.apprentice",
       "name": "Apprentice",
       "description": "Workshop errands gave you a little practical knowledge.",
-      "bonuses": { "Engineering": 2, "Science": 2 }
+      "difficulty": "Standard",
+      "bonuses": { "Engineering": 4, "Science": 4 },
+      "items": [ { "record": "43404-changes_otto.mod", "quantity": 1 } ]
     },
     {
       "id": "kenshiorigins.streeturchin",
       "name": "Street Urchin",
       "description": "Keeping out of sight was often the easiest way to survive.",
-      "bonuses": { "Stealth": 3, "Thieving": 2 }
+      "difficulty": "Standard",
+      "bonuses": { "Stealth": 5, "Thieving": 3 },
+      "items": [ { "record": "42334-changes_otto.mod", "quantity": 1 } ]
+    },
+    {
+      "id": "kenshiorigins.soldier",
+      "name": "Soldier",
+      "description": "Long watches and short rations were your share of soldiering. Drill taught you to hold a line; the first real battle taught you to keep your guard up. The uniform is gone, but the habits remain.",
+      "difficulty": "Easy",
+      "bonuses": { "MeleeAttack": 3, "MeleeDefence": 5 },
+      "items": [ { "record": "475-gamedata.base", "quantity": 1, "quality": 0 } ]
+    },
+    {
+      "id": "kenshiorigins.gunner",
+      "name": "Gunner",
+      "description": "From a battered turret above the gate, you learned to judge distance and wait for a clear shot. A crossbow served when the road took you beyond the walls. You still count your bolts before your cats.",
+      "difficulty": "Easy",
+      "bonuses": { "Crossbows": 5, "Turrets": 3 },
+      "items": [
+        { "record": "66534-Newwworld.mod", "quantity": 1, "quality": 10 },
+        { "record": "96014-rebirth.mod", "quantity": 2 }
+      ]
+    },
+    {
+      "id": "kenshiorigins.assassin",
+      "name": "Assassin",
+      "description": "Your old employer paid for quiet work and asked few questions. You learned to follow a mark, wait in the dark, and strike before they could raise an alarm. Leaving that trade has not made sleep any easier.",
+      "difficulty": "Easy",
+      "bonuses": { "Assassination": 5, "Stealth": 3 },
+      "items": [ { "record": "1020-gamedata.base", "quantity": 1, "quality": 0 } ]
     }
   ]
 }

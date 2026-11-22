@@ -5,7 +5,8 @@ using Meitou.Data.Gameplay.Bodies;
 namespace KenshiOrigins;
 
 /// <summary>An immutable definition shared by characters; their assignments store its stable ID.</summary>
-internal sealed record OriginDefinition(string Id, string Name, string Description, IReadOnlyDictionary<StatsEnumerated, float> Bonuses)
+internal sealed record OriginDefinition(string Id, string Name, string Description, IReadOnlyDictionary<StatsEnumerated, float> Bonuses,
+    IReadOnlyList<OriginItem> Items, string Difficulty)
 {
     internal string BonusSummary => Bonuses.Count == 0 ? "No stat bonuses" : string.Join(", ", Bonuses.OrderBy(b => b.Key)
         .Select(b => $"{b.Value.ToString("+0.##;-0.##;0", CultureInfo.InvariantCulture)} {StatName(b.Key)}"));
@@ -25,7 +26,9 @@ internal sealed class OriginJson
     public string? Id { get; init; }
     public string? Name { get; init; }
     public string? Description { get; init; }
+    public string? Difficulty { get; init; }
     public Dictionary<string, float>? Bonuses { get; init; }
+    public List<OriginItemJson>? Items { get; init; }
 
     internal OriginDefinition Validate()
     {
@@ -44,6 +47,26 @@ internal sealed class OriginJson
             if (storage == StatsEnumerated.None || !resolved.TryAdd(storage, amount))
                 throw new InvalidDataException($"Origin '{Id}' has an unsupported stat or repeats shared stat storage: '{name}'.");
         }
-        return new OriginDefinition(Id, Name.Trim(), Description.Trim(), resolved.AsReadOnly());
+        var items = Items?.Select(item => item?.Validate()
+            ?? throw new InvalidDataException($"Origin '{Id}' has a null item.")).ToArray() ?? [];
+        return new OriginDefinition(Id, Name.Trim(), Description.Trim(), resolved.AsReadOnly(), Array.AsReadOnly(items),
+            string.IsNullOrWhiteSpace(Difficulty) ? "Unrated" : Difficulty.Trim());
+    }
+}
+
+/// <summary>An inventory grant, addressed by the stable FCS record ID rather than its translated name.</summary>
+internal sealed record OriginItem(string Record, int Quantity, int Quality);
+
+internal sealed class OriginItemJson
+{
+    public string? Record { get; init; }
+    public int Quantity { get; init; } = 1;
+    public int Quality { get; init; }
+
+    internal OriginItem Validate()
+    {
+        if (string.IsNullOrWhiteSpace(Record) || Quantity is < 1 or > 1000 || Quality is < 0 or > 100)
+            throw new InvalidDataException("Origin items need a record ID, quantity 1–1000 and quality 0–100.");
+        return new OriginItem(Record.Trim(), Quantity, Quality);
     }
 }

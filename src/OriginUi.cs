@@ -16,8 +16,9 @@ namespace KenshiOrigins;
 /// <summary>Version-specific UI bridges. Rendering uses editor drafts or published views, never live character stats.</summary>
 internal static class OriginUi
 {
+    internal const string OriginStat = "kenshiorigins.origin";
     private static Action<string> s_log = null!;
-    private static FieldInfo s_session = null!, s_statsPlayer = null!;
+    private static FieldInfo s_session = null!, s_statsPlayer = null!, s_selectedStat = null!, s_uiResources = null!;
     private static MethodInfo s_selected = null!, s_publishPaused = null!;
     private static readonly ConditionalWeakTable<World, object> PausedFaults = new();
 
@@ -28,7 +29,9 @@ internal static class OriginUi
         var player = game.GetType("Meitou.Game.PlayerInterface", throwOnError: true)!;
         var stats = game.GetType("Meitou.Game.Ui.StatsWindow", throwOnError: true)!;
         s_session = RequireField(player, "Session", typeof(WorldSession));
+        s_uiResources = RequireField(player, "UiResources", typeof(MyGuiResources));
         s_statsPlayer = OwnerField(stats, player);
+        s_selectedStat = RequireField(stats, "SelectedStat", typeof(string));
         s_selected = RequireMethod(player, "Selected");
         s_publishPaused = RequireMethod(typeof(World), "PublishPaused");
 
@@ -106,11 +109,38 @@ internal static class OriginUi
         float available = panel.Bounds.Y + panel.Bounds.Height - top;
         if (available < 24 * scale) return;
         var box = new UiRect(panel.Bounds.X + 4 * scale, top, panel.Bounds.Width - 8 * scale, available);
-        AddText(controls, "stats", box, $"Origin: {view.Name}\n{view.Bonuses}", Math.Max(8, (int)(13 * scale)), Vector4.Zero,
-            panel.Clip ?? panel.Bounds);
+        int pixels = Math.Max(8, (int)(13 * scale));
+        string ink = MyGuiColours.TemplateInk((MyGuiResources)s_uiResources.GetValue(player)!, "Kenshi_GenericTextBoxSkin");
+        var clip = panel.Bounds.Intersect(panel.Clip ?? panel.Bounds);
+        var heading = box with { Height = Math.Min(20 * scale, box.Height) };
+        AddText(controls, "stats", heading, $"Origin: {view.Name}", pixels, Vector4.Zero, clip, ink);
+        // Native stat actions support both hover and click, including nonnumeric mod IDs.
+        controls[^1] = controls[^1] with { Type = "Button", Action = "stat:" + OriginStat, Pickable = true };
+        AddText(controls, "stats-summary", box with { Y = box.Y + heading.Height, Height = box.Height - heading.Height },
+            $"{view.Bonuses}\nHover or click Origin for its story.", pixels, Vector4.Zero, clip, ink);
+
+        // An empty selection is the screen's normal opening state. Real skill selections keep
+        // their own description; our entry uses the same selection mechanism to return here.
+        string selectedStat = (string)s_selectedStat.GetValue(__instance)!;
+        if (selectedStat.Length > 0 && selectedStat != OriginStat) return;
+        if (controls.FirstOrDefault(c => c.Name == "Description1Panel") is not { } left
+            || controls.FirstOrDefault(c => c.Name == "Description2Panel") is not { } right) return;
+        string waiting = view.ItemsWaiting > 0 ? $"\n{view.ItemsWaiting} item(s) waiting for inventory space." : "";
+        AddOriginDescription(controls, left, $"Origin: {view.Name}\nDifficulty: {view.Difficulty}\n\nBonuses\n{view.Bonuses}\n\nStarting items\n{view.Items}{waiting}",
+            scale, "stats-bonuses", ink);
+        AddOriginDescription(controls, right, view.Description, scale, "stats-story", ink);
     }
 
-    private static void AddText(List<UiControl> controls, string name, UiRect box, string text, int pixels, Vector4 background, UiRect? clip = null)
+    private static void AddOriginDescription(List<UiControl> controls, UiControl panel, string text, float scale, string name, string ink)
+    {
+        float inset = 12 * scale;
+        var box = new UiRect(panel.Bounds.X + inset, panel.Bounds.Y + 8 * scale,
+            Math.Max(0, panel.Bounds.Width - 2 * inset), Math.Max(0, panel.Bounds.Height - 16 * scale));
+        AddText(controls, name, box, text, Math.Max(8, (int)(14 * scale)), Vector4.Zero,
+            panel.Bounds.Intersect(panel.Clip ?? panel.Bounds), ink);
+    }
+
+    private static void AddText(List<UiControl> controls, string name, UiRect box, string text, int pixels, Vector4 background, UiRect clip, string ink)
     {
         controls.Add(new UiControl($"kenshiorigins.{name}", "TextBox", box, text, "", "", true,
             new Dictionary<string, string>
@@ -118,7 +148,7 @@ internal static class OriginUi
                 ["TextAlign"] = "Left Top",
                 ["WordWrap"] = "true",
                 ["FontPixels"] = pixels.ToString(CultureInfo.InvariantCulture),
-                ["TextColour"] = "0.95 0.90 0.75"
-            }, background, Pickable: false, Clip: clip ?? box));
+                ["TextColour"] = ink
+            }, background, Pickable: false, Clip: clip));
     }
 }

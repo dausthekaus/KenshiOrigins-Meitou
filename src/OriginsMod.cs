@@ -11,7 +11,7 @@ public sealed class OriginsMod : IMod
     public void Initialize(ModContext context)
     {
         var catalog = OriginCatalog.Load(context.Folder, context.Name, context.Data, context.Log);
-        context.AddSystem("origins", _ => new OriginSystem(catalog, context.RngPurpose, context.Log), SystemAnchor.End);
+        context.AddSystem("origins", _ => new OriginSystem(catalog, context.RngPurpose, context.Log, context.Population.Items), SystemAnchor.End);
         OriginUi.Install(context.Harmony, catalog, context.LogError);
     }
 }

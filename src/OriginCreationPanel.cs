@@ -17,6 +17,7 @@ internal static class OriginCreationPanel
     internal const string RaceButton = "kenshiorigins.race";
     internal const string OriginButton = "kenshiorigins.origin";
     internal const string Combo = "kenshiorigins.dropdown";
+    internal const string RandomOption = "kenshiorigins:random";
     private const string Screen = "editor";
 
     private static OriginCatalog s_catalog = null!;
@@ -38,8 +39,8 @@ internal static class OriginCreationPanel
         s_catalog = catalog;
         s_log = log;
         // Use the engine's draft setter so it increments Version and Confirm includes the edit.
-        var row = LookRow.Choice(EditorTab.Body, OriginSystem.ChoiceKey, "Origin", catalog.All.Select(o => o.Name).ToArray());
-        s_choice = new EditorControl("Origin", EditorControlKind.ModChoice, 0, catalog.All.Count - 1, 0) { Mod = OriginsMod.Id, Row = row };
+        var row = LookRow.Choice(EditorTab.Body, OriginSystem.ChoiceKey, "Origin", [.. catalog.All.Select(o => o.Name), "Random"]);
+        s_choice = new EditorControl("Origin", EditorControlKind.ModChoice, 0, catalog.All.Count, 0) { Mod = OriginsMod.Id, Row = row };
         var game = typeof(IMod).Assembly;
         var player = game.GetType("Meitou.Game.PlayerInterface", throwOnError: true)!;
         var editor = game.GetType("Meitou.Game.Editor.CharacterEditorPanel", throwOnError: true)!;
@@ -93,10 +94,13 @@ internal static class OriginCreationPanel
         OriginView? origin = null;
         if (draft is not null)
         {
-            var definition = s_catalog.All[system.ReadChoice(draft.Record)];
-            origin = new OriginView(definition.Name, definition.Description, definition.BonusSummary, true);
-            b.Lists[Combo] = s_catalog.All.Select(o => new UiListItem(o.Id, o.Name)).ToArray();
-            b.SelectedItems[Combo] = s_catalog.IndexOf(definition.Id);
+            int choice = system.ReadChoice(draft.Record);
+            origin = choice == s_catalog.All.Count
+                ? new OriginView("Random", "Choose a random origin from the loaded pool when you confirm character creation.",
+                    "Determined by the chosen origin", true, "Varies", "Determined by the chosen origin")
+                : system.Preview(s_catalog.All[choice]);
+            b.Lists[Combo] = [.. s_catalog.All.Select(o => new UiListItem(o.Id, o.Name)), new UiListItem(RandomOption, "Random")];
+            b.SelectedItems[Combo] = choice;
         }
         else if (system.Views.TryGetValue(id, out var pending)) origin = pending;
 
@@ -119,7 +123,7 @@ internal static class OriginCreationPanel
         bool choosing = state.ShowOrigin && draft is not null;
         b.RelativePositions[body] = choosing ? new(.025f, .35f, .95f, .62f) : new(.025f, .18f, .95f, .79f);
         if (state.ShowOrigin && origin is not null)
-            b.Text["DescriptionPanelText"] = $"{origin.Name}\n\n{origin.Description}\n\nBonuses\n{origin.Bonuses}";
+            b.Text["DescriptionPanelText"] = $"{origin.Name}\nDifficulty: {origin.Difficulty}\n\n{origin.Description}\n\nBonuses\n{origin.Bonuses}\n\nStarting items\n{origin.Items}";
     }
 
     private static Dictionary<string, string> Checked(bool selected) => new()
@@ -180,7 +184,7 @@ internal static class OriginCreationPanel
         }
         if (e.Widget != Combo) return true;
         if (e.Action is not ("select" or "accept") || s_draft.Invoke(__instance, [id]) is not CharacterDraft draft) return false;
-        int index = s_catalog.IndexOf(e.Text);
+        int index = e.Text == RandomOption ? s_catalog.All.Count : s_catalog.IndexOf(e.Text);
         if (index >= 0) draft.Set(s_choice, index);
         return false;
     }
