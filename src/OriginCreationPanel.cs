@@ -11,11 +11,15 @@ using Meitou.Simulation.Editing;
 
 namespace KenshiOrigins;
 
-/// <summary>Extends the existing description panel with two views and a native dropdown.</summary>
+/// <summary>Race/origin mode switch, live search, origin selector, horizontal tags, and a scrollable description.</summary>
 internal static class OriginCreationPanel
 {
-    internal const string RaceButton = "kenshiorigins.race";
-    internal const string OriginButton = "kenshiorigins.origin";
+    internal const string ModeButton = "kenshiorigins.mode";
+    internal const string Search = "kenshiorigins.search";
+    internal const string SearchHint = "kenshiorigins.search-hint";
+    internal const string TagRow = "kenshiorigins.tags";
+    internal const string TagButtonPrefix = "kenshiorigins.tag-";
+    internal const string ResultCount = "kenshiorigins.results";
     internal const string Combo = "kenshiorigins.dropdown";
     internal const string RandomOption = "kenshiorigins:random";
     private const string Screen = "editor";
@@ -23,7 +27,7 @@ internal static class OriginCreationPanel
     private static OriginCatalog s_catalog = null!;
     private static EditorControl s_choice = null!;
     private static Action<string> s_log = null!;
-    private static FieldInfo s_opening = null!, s_player = null!, s_session = null!, s_screens = null!, s_layout = null!;
+    private static FieldInfo s_opening = null!, s_player = null!, s_session = null!, s_screens = null!, s_layout = null!, s_height = null!;
     private static PropertyInfo s_kind = null!, s_current = null!;
     private static MethodInfo s_draft = null!;
     private static readonly ConditionalWeakTable<object, PanelState> States = new();
@@ -32,6 +36,9 @@ internal static class OriginCreationPanel
     {
         internal bool ShowOrigin = true;
         internal bool MissingPanelLogged;
+        internal string Query = "";
+        internal string Tag = "";
+        internal CharacterId Character = CharacterId.None;
     }
 
     internal static void Install(Harmony harmony, OriginCatalog catalog, Action<string> log)
@@ -48,6 +55,7 @@ internal static class OriginCreationPanel
         s_player = editor.GetFields(BindingFlags.Instance | BindingFlags.NonPublic).Single(f => f.FieldType == player);
         s_session = Field(player, "Session");
         s_screens = Field(player, "FaithfulScreens");
+        s_height = Field(player, "Height");
         s_layout = Field(editor, "EditorLayout");
         s_kind = AccessTools.Property(s_opening.FieldType, "Kind") ?? throw new MissingMemberException("EditorSession.Kind");
         s_current = AccessTools.Property(s_opening.FieldType, "Current") ?? throw new MissingMemberException("EditorSession.Current");
@@ -85,22 +93,37 @@ internal static class OriginCreationPanel
         if (!Context(__instance, out var opening, out var screens, out var system, out var id))
         {
             // The same screen also serves surgeons and recruits. Keep its normal description there.
-            b.Hidden.UnionWith([RaceButton, OriginButton, Combo]);
+            b.Hidden.UnionWith([ModeButton, Search, SearchHint, TagRow, Combo, ResultCount]);
             return;
         }
         var state = States.GetValue(opening, _ => new PanelState());
         if (!EnsureLayout(__instance, screens, state)) return;
+        if (state.Character != id)
+        {
+            state.Character = id;
+            screens.SetScroll(Screen, "DescriptionPanelText", 0);
+        }
         var draft = s_draft.Invoke(__instance, [id]) as CharacterDraft;
         OriginView? origin = null;
+        string tags = "";
         if (draft is not null)
         {
             int choice = system.ReadChoice(draft.Record);
             origin = choice == s_catalog.All.Count
-                ? new OriginView("Random", "Choose a random origin from the loaded pool when you confirm character creation.",
+                ? new OriginView("Random", "Choose a random origin when you confirm character creation. Testing-only origins are excluded.",
                     "Determined by the chosen origin", true, "Varies", "Determined by the chosen origin")
                 : system.Preview(s_catalog.All[choice]);
-            b.Lists[Combo] = [.. s_catalog.All.Select(o => new UiListItem(o.Id, o.Name)), new UiListItem(RandomOption, "Random")];
-            b.SelectedItems[Combo] = choice;
+            if (choice < s_catalog.All.Count) tags = string.Join(", ", s_catalog.All[choice].Tags);
+            var matches = OriginBrowser.Filter(s_catalog, state.Query, state.Tag);
+            var options = matches.Select(o => new UiListItem(o.Id, o.Name, Colour: o.TestingOnly ? OriginUi.TestingInk : null))
+                .Append(new UiListItem(RandomOption, "Random")).ToArray();
+            b.Lists[Combo] = options;
+            string selectedId = choice == s_catalog.All.Count ? RandomOption : s_catalog.All[choice].Id;
+            int selectedIndex = Array.FindIndex(options, option => option.Id == selectedId);
+            b.SelectedItems[Combo] = selectedIndex;
+            // A filter may exclude the saved choice. Keep its caption and draft until the player selects another.
+            b.Text[Combo] = origin.Name;
+            b.Text[ResultCount] = matches.Count == 0 ? "No matches; choice kept" : $"{matches.Count} origins" + (selectedIndex < 0 ? "; choice kept" : "");
         }
         else if (system.Views.TryGetValue(id, out var pending)) origin = pending;
 
@@ -108,22 +131,84 @@ internal static class OriginCreationPanel
         screens.ClearSelection(Screen, Combo);
         b.Hidden.Add("lbRaceDescription");
         // The screen router disables buttons before the editor supplies its bindings.
-        b.Disabled.Remove(RaceButton);
-        b.Disabled.Remove(OriginButton);
-        b.Actions[RaceButton] = RaceButton;
-        b.Actions[OriginButton] = OriginButton;
-        b.Properties[RaceButton] = Checked(!state.ShowOrigin);
-        b.Properties[OriginButton] = Checked(state.ShowOrigin);
-        b.Text[RaceButton] = "Race";
-        b.Text[OriginButton] = "Origin";
-        if (!state.ShowOrigin || draft is null) b.Hidden.Add(Combo);
-
-        var body = screens.Layout(Screen).Find("DescriptionPanelText");
-        if (body is null) return;
+        b.Disabled.Remove(ModeButton);
+        b.Actions[ModeButton] = ModeButton;
+        b.Properties[ModeButton] = Checked(state.ShowOrigin);
+        b.Text[ModeButton] = state.ShowOrigin ? "Origin" : "Race";
+        b.Text[Search] = state.Query;
+        b.Text[SearchHint] = "Search...";
+        if (state.Query.Length > 0) b.Hidden.Add(SearchHint);
         bool choosing = state.ShowOrigin && draft is not null;
-        b.RelativePositions[body] = choosing ? new(.025f, .35f, .95f, .62f) : new(.025f, .18f, .95f, .79f);
+        if (!choosing) b.Hidden.UnionWith([Search, SearchHint, TagRow, Combo, ResultCount]);
+
+        var layout = screens.Layout(Screen);
+        if (origin?.TestingOnly == true)
+        {
+            // The fallback caption is used when browsing filters hide the selected entry.
+            var client = layout.Find(Combo)?.Children.FirstOrDefault(w => w.Properties.GetValueOrDefault("TemplatePart") == "Client");
+            if (client is not null) b.Properties[client.Name] = new Dictionary<string, string> { ["TextColour"] = OriginUi.TestingInk };
+        }
+        void Position(string name, UiRect position)
+        {
+            if (layout.Find(name) is { } widget) b.RelativePositions[widget] = position;
+        }
+        var descriptionRegion = layout.Find("DescriptionPanel")!.Position;
+        if (choosing)
+        {
+            // Give the description the race-stat area's space while browsing origins. Race mode
+            // and non-creation editors keep the original panels and geometry.
+            float bottom = layout.Find("StatsPanel") is { RealPosition: true } raceStats
+                ? raceStats.Position.Y + raceStats.Position.Height : descriptionRegion.Y + descriptionRegion.Height;
+            descriptionRegion = descriptionRegion with { Width = Math.Max(descriptionRegion.Width, .255f), Height = bottom - descriptionRegion.Y };
+            Position("DescriptionPanel", descriptionRegion);
+            b.Hidden.Add("StatsPanel");
+        }
+        if (!choosing) Position(ModeButton, new(.025f, .02f, .35f, .15f));
+        if (choosing)
+        {
+            // Headers keep the same readable size as the panel grows; remaining height goes to the story.
+            float height = Math.Max(1, (int)s_height.GetValue(s_player.GetValue(__instance))! * descriptionRegion.Height);
+            float scale = b.TemplateScale;
+            float Unit(float pixels) => pixels * scale / height;
+            Position(ModeButton, new(.025f, Unit(8), .285f, Unit(30)));
+            Position(Search, new(.335f, Unit(8), .64f, Unit(30)));
+            Position(SearchHint, new(.36f, Unit(8), .55f, Unit(30)));
+            Position(Combo, new(.025f, Unit(44), .95f, Unit(30)));
+            Position(TagRow, new(.025f, Unit(80), .95f, Unit(46)));
+            Position(ResultCount, new(.035f, Unit(132), .93f, Unit(18)));
+            Position("DescriptionPanelText", new(.025f, Unit(156), .95f, Math.Max(0, 1 - Unit(164))));
+            var categories = Categories();
+            float totalWidth = categories.Sum(tag => TagWidth(tag) + 6);
+            // Only the horizontal axis scrolls. Let the skin supply the client height so rounding
+            // cannot create a tiny hidden vertical range that steals the mouse wheel.
+            b.Canvas[TagRow] = (totalWidth * scale, 0);
+            float x = 0;
+            for (int index = 0; index < categories.Length; index++)
+            {
+                string name = TagButtonPrefix + index;
+                string tag = categories[index];
+                b.Disabled.Remove(name);
+                b.Actions[name] = name;
+                b.Text[name] = tag;
+                b.Properties[name] = Checked(index == 0 ? state.Tag.Length == 0 : state.Tag == tag);
+                Position(name, new(x / totalWidth, 0, TagWidth(tag) / totalWidth, 1));
+                x += TagWidth(tag) + 6;
+            }
+        }
+
+        var body = layout.Find("DescriptionPanelText");
+        if (body is null) return;
+        if (!choosing) b.RelativePositions[body] = new(.025f, .19f, .95f, .78f);
         if (state.ShowOrigin && origin is not null)
-            b.Text["DescriptionPanelText"] = $"{origin.Name}\nDifficulty: {origin.Difficulty}\n\n{origin.Description}\n\nBonuses\n{origin.Bonuses}\n\nStarting items\n{origin.Items}";
+        {
+            if (origin.TestingOnly)
+                foreach (var text in body.DescendantsAndSelf().Where(w => w.Name == body.Name
+                    || w.Properties.GetValueOrDefault("CaptionOwner") == body.Name))
+                    b.Properties[text.Name] = new Dictionary<string, string> { ["TextColour"] = OriginUi.TestingInk };
+            b.Text["DescriptionPanelText"] = $"{origin.Name}\nDifficulty: {origin.Difficulty}" + (tags.Length > 0 ? $"\nTags: {tags}" : "")
+                + (origin.TestingOnly ? "\nTESTING ONLY — manual selection; excluded from random origins." : "")
+                + $"\n\n{origin.Description}\n\nBonuses\n{origin.Bonuses}\n\nStarting items\n{origin.Items}";
+        }
     }
 
     private static Dictionary<string, string> Checked(bool selected) => new()
@@ -154,7 +239,20 @@ internal static class OriginCreationPanel
         MyGuiWidget Visit(MyGuiWidget widget)
         {
             if (widget.Name == "DescriptionPanel")
-                return widget with { Children = [.. widget.Children, Button(RaceButton, .025f), Button(OriginButton, .51f), Dropdown()] };
+                return widget with { Children = [.. widget.Children,
+                    new MyGuiWidget("Button", ModeButton, "Kenshi_Button1", "", "Left Top", new(.025f, .02f, .285f, .095f), true,
+                        new Dictionary<string, string> { ["TextAlign"] = "Center VCenter" }, new Dictionary<string, string>(), []),
+                    new MyGuiWidget("EditBox", Search, "Kenshi_EditBox", "", "Left Top", new(.335f, .02f, .64f, .095f), true,
+                        new Dictionary<string, string> { ["MultiLine"] = "false", ["MaxTextLength"] = "100", ["SubmitAction"] = "search" },
+                        new Dictionary<string, string>(), []),
+                    Label(SearchHint, new(.36f, .02f, .55f, .095f)),
+                    Dropdown(Combo, new(.025f, .135f, .95f, .095f)),
+                    new MyGuiWidget("ScrollView", TagRow, "Kenshi_ScrollViewEmpty", "", "Left Top", new(.025f, .25f, .95f, .14f), true,
+                        new Dictionary<string, string> { ["VisibleVScroll"] = "false", ["VisibleHScroll"] = "true", ["CanvasAlign"] = "Left Top" },
+                        new Dictionary<string, string>(), Categories().Select((tag, index) =>
+                            new MyGuiWidget("Button", TagButtonPrefix + index, "Kenshi_Button1", "", "Left Top", new(0, 0, 1, 1), true,
+                                new Dictionary<string, string> { ["TextAlign"] = "Center VCenter" }, new Dictionary<string, string>(), [])).ToArray()),
+                    Label(ResultCount, new(.035f, .40f, .93f, .055f))] };
             var children = widget.Children.Select(Visit).ToArray();
             // BindEditor has already positioned the body controls using widget-keyed bindings.
             // Preserve those objects; only the description panel and its ancestors need copies.
@@ -164,28 +262,57 @@ internal static class OriginCreationPanel
         return layout with { Roots = layout.Roots.Select(Visit).ToArray() };
     }
 
-    private static MyGuiWidget Button(string name, float left) => new("Button", name, "Kenshi_Button1", "", "Left Top",
-        new(left, .02f, .465f, .135f), true, new Dictionary<string, string> { ["TextAlign"] = "Center VCenter" },
+    private static MyGuiWidget Label(string name, UiRect position) => new("TextBox", name, "Kenshi_TextboxStandardText", "", "Left Top", position,
+        true, new Dictionary<string, string> { ["NeedMouse"] = "false", ["TextAlign"] = "Left VCenter" }, new Dictionary<string, string>(), []);
+
+    private static MyGuiWidget Dropdown(string name, UiRect position) => new("ComboBox", name, "Kenshi_ComboBox", "", "Left Top", position, true,
+        // The template's Client paints the selected text. The owner still supplies a fallback
+        // caption for filtered-out selections, but must never paint that caption a second time.
+        new Dictionary<string, string> { ["ReadOnly"] = "true", ["MaxListLength"] = "240", ["SmoothShow"] = "false", ["SkipCaption"] = "true" },
         new Dictionary<string, string>(), []);
 
-    private static MyGuiWidget Dropdown() => new("ComboBox", Combo, "Kenshi_ComboBox", "", "Left Top",
-        new(.025f, .18f, .95f, .14f), true,
-        new Dictionary<string, string> { ["ReadOnly"] = "true", ["MaxListLength"] = "240" }, new Dictionary<string, string>(), []);
+    private static string[] Categories() => ["All tags", .. OriginBrowser.Tags(s_catalog)];
+    private static float TagWidth(string tag) => Math.Max(72, tag.Length * 9 + 24);
 
     /// <summary>Selection writes straight to the current draft; no secondary Apply/Save action exists.</summary>
     private static bool Action(object __instance, MyGuiEvent e)
     {
-        if (e.Screen != Screen || !Context(__instance, out var opening, out _, out _, out var id)) return true;
+        if (e.Screen != Screen || !Context(__instance, out var opening, out var screens, out _, out var id)) return true;
         var state = States.GetValue(opening, _ => new PanelState());
-        if (e.Widget == RaceButton || e.Widget == OriginButton)
+        if (e.Widget == ModeButton)
         {
-            state.ShowOrigin = e.Widget == OriginButton;
+            state.ShowOrigin = !state.ShowOrigin;
+            screens.Blur();
+            screens.SetScroll(Screen, "DescriptionPanelText", 0);
+            return false;
+        }
+        if (e.Widget == Search)
+        {
+            if (e.Action is "text" or "search")
+            {
+                state.Query = e.Text;
+                screens.SetScroll(Screen, Combo + "@popup", 0);
+            }
+            return false;
+        }
+        if (e.Widget.StartsWith(TagButtonPrefix, StringComparison.Ordinal))
+        {
+            var categories = Categories();
+            if (int.TryParse(e.Widget.AsSpan(TagButtonPrefix.Length), out int tagIndex) && (uint)tagIndex < categories.Length)
+            {
+                state.Tag = tagIndex == 0 ? "" : categories[tagIndex];
+                screens.SetScroll(Screen, Combo + "@popup", 0);
+            }
             return false;
         }
         if (e.Widget != Combo) return true;
         if (e.Action is not ("select" or "accept") || s_draft.Invoke(__instance, [id]) is not CharacterDraft draft) return false;
         int index = e.Text == RandomOption ? s_catalog.All.Count : s_catalog.IndexOf(e.Text);
-        if (index >= 0) draft.Set(s_choice, index);
+        if (index >= 0)
+        {
+            draft.Set(s_choice, index);
+            screens.SetScroll(Screen, "DescriptionPanelText", 0);
+        }
         return false;
     }
 }

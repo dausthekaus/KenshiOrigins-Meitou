@@ -18,12 +18,17 @@ internal sealed class OriginCatalog
 
     private readonly Dictionary<string, OriginDefinition> _byId = new(StringComparer.Ordinal);
     internal IReadOnlyList<OriginDefinition> All { get; }
+    internal IReadOnlyList<int> RecruitChoices { get; }
+    internal IReadOnlyList<int> StartingRandomChoices { get; }
 
     internal OriginCatalog(IEnumerable<OriginDefinition> definitions)
     {
         foreach (var origin in definitions) _byId.Add(origin.Id, origin);
         if (_byId.Count == 0) throw new InvalidDataException("The origin pool must not be empty.");
         All = _byId.Values.ToArray();
+        // Keep the original catalog indices: creation drafts and saved IDs must not shift.
+        StartingRandomChoices = Enumerable.Range(0, All.Count).Where(i => !All[i].TestingOnly).ToArray();
+        RecruitChoices = StartingRandomChoices.Where(i => !All[i].StartingCharactersOnly).ToArray();
     }
 
     internal OriginDefinition? Find(string id) => _byId.GetValueOrDefault(id);

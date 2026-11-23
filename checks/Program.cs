@@ -28,6 +28,26 @@ internal static class PrototypeChecks
         string repo = Path.GetFullPath(args[0]);
         int uiArgument = Array.IndexOf(args, "--ui-root");
         string? uiRoot = uiArgument >= 0 ? args[uiArgument + 1] : GameInstall.Locate()?.Root;
+        if (args.Contains("--export-vanilla-items"))
+        {
+            VanillaItemReference.Write(repo, uiRoot ?? throw new ArgumentException("Pass --ui-root with the Kenshi installation folder."));
+            return;
+        }
+        int validateArgument = Array.IndexOf(args, "--validate-origins");
+        if (validateArgument >= 0)
+        {
+            OriginContentChecks.Run(new OriginCatalog(OriginCatalog.ReadFile(args[validateArgument + 1])),
+                uiRoot ?? throw new ArgumentException("Pass --ui-root with the Kenshi installation folder."),
+                (condition, message) =>
+                {
+                    if (!condition) throw new InvalidDataException(message);
+                    Console.WriteLine("  OK " + message);
+                });
+            return;
+        }
+        int themeArgument = Array.IndexOf(args, "--ui-theme");
+        string? theme = themeArgument >= 0 ? args[themeArgument + 1] : null;
+        string? preview = args.Contains("--render-ui") ? Path.Combine(repo, "artifacts", theme is null ? "origin-ui.png" : "origin-ui-theme.png") : null;
         if (args.Contains("--generate"))
         {
             WriteMod(Path.Combine(repo, "KenshiOrigins.mod"), "Character origins for MeitouClient.");
@@ -38,8 +58,11 @@ internal static class PrototypeChecks
 
         int assertions = 0;
         var logs = new List<string>();
-        var catalog = new OriginCatalog(OriginCatalog.ReadFile(Path.Combine(repo, OriginCatalog.FileName)));
-        Check(catalog.All.Count == 7, "seven built-in definitions validate");
+        // Fixed content keeps UI interaction and lifecycle regressions independent of authored balance changes.
+        string fixtures = Path.Combine(repo, "checks", "fixtures");
+        var catalog = new OriginCatalog(OriginCatalog.ReadFile(Path.Combine(fixtures, OriginCatalog.FileName)));
+        var bundled = new OriginCatalog(OriginCatalog.ReadFile(Path.Combine(repo, OriginCatalog.FileName)));
+        Check(bundled.All.Count > 0, $"{bundled.All.Count} authored origin definitions validate");
         var db = new GameDatabase();
         var records = new FcsFile();
         records.Records.Add(new FcsRecord { StringId = "204-gamedata.base", Name = "Nameless", RecordType = FcsRecordType.Faction });
@@ -59,8 +82,11 @@ internal static class PrototypeChecks
             CheckDiscovery();
             CheckValidation();
             CheckLifecycle();
+            CheckStartOnlyOrigins();
+            CheckTestingOrigins();
             CheckCombatOrigins();
-            EquipmentChecks.Run(catalog, uiRoot, Check);
+            EquipmentChecks.Run(bundled, uiRoot, Check);
+            if (uiRoot is not null) OriginContentChecks.Run(bundled, uiRoot, Check);
             CheckUi();
             Check(DeterministicHash(1) == DeterministicHash(4), "assignments and hashes agree with one and four worker threads");
             Console.WriteLine($"PASS: {assertions} assertions against {typeof(IMod).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion}.");
@@ -91,7 +117,7 @@ internal static class PrototypeChecks
             }
             packDb.NotLoaded.Add(new LoadOrderEntry("Missing.mod", "unused"));
             packDb.Files.Remove("Missing.mod");
-            var found = OriginCatalog.Load(repo, "KenshiOrigins", packDb, logs.Add);
+            var found = OriginCatalog.Load(fixtures, "KenshiOrigins", packDb, logs.Add);
             Check(found.Find("enabled.dockworker") is not null, "direct dependent loaded mod contributes origins");
             Check(found.Find("disabled.dockworker") is null, "installed but disabled pack is ignored");
             Check(found.Find("unrelated.dockworker") is null, "mod without our master is ignored");
@@ -107,7 +133,7 @@ internal static class PrototypeChecks
             string invalid = Path.Combine(scratch, "invalid");
             Directory.CreateDirectory(invalid);
             string path = Path.Combine(invalid, OriginCatalog.FileName);
-            string valid = File.ReadAllText(Path.Combine(repo, OriginCatalog.FileName));
+            string valid = File.ReadAllText(Path.Combine(fixtures, OriginCatalog.FileName));
             foreach (string text in new[]
             {
                 valid.Replace("\"Strength\"", "\"Strenght\""),
@@ -121,7 +147,13 @@ internal static class PrototypeChecks
                 valid.Replace("\"quality\": 0", "\"quality\": -1"),
                 valid.Replace("\"quality\": 0", "\"quality\": 101"),
                 valid.Replace("2064-gamedata.base", " "),
-                valid.Replace("\"difficulty\": \"Standard\"", "\"difficulty\": 3")
+                valid.Replace("\"difficulty\": \"Standard\"", "\"difficulty\": 3"),
+                valid.Replace("\"startingCharactersOnly\": false", "\"startingCharactersOnly\": \"true\""),
+                valid.Replace("\"startingCharactersOnly\": false", "\"startingCharactersOnly\": null"),
+                valid.Replace("\"startingCharactersOnly\": false", "\"startingCharactersOnly\": false, \"testingOnly\": \"true\""),
+                valid.Replace("[\"Civilian\", \"Farming\"]", "[\"\"]"),
+                valid.Replace("[\"Civilian\", \"Farming\"]", "[null]"),
+                valid.Replace("[\"Civilian\", \"Farming\"]", "[42]")
             })
             {
                 File.WriteAllText(path, text);
@@ -134,8 +166,32 @@ internal static class PrototypeChecks
             var pool = catalog.All.ToList();
             OriginCatalog.AddPack(pool, invalid, logs.Add);
             Check(pool.Count == catalog.All.Count, "duplicate pack IDs cannot overwrite existing definitions");
-            var oldPack = OriginCatalog.ReadFile(Path.Combine(repo, "examples/ExtraOrigins/originform.json")).Single();
-            Check(oldPack.Items.Count == 0 && oldPack.Difficulty == "Unrated", "existing packs can omit items and difficulty");
+            File.WriteAllText(path, """
+                { "formatVersion": 1, "origins": [
+                  { "id": "oldpack.legacy", "name": "Legacy", "description": "Old pack", "bonuses": {} }
+                ] }
+                """);
+            var oldPack = OriginCatalog.ReadFile(path).Single();
+            Check(oldPack.Items.Count == 0 && oldPack.Difficulty == "Unrated" && oldPack.Tags.Count == 0
+                && !oldPack.StartingCharactersOnly && !oldPack.TestingOnly,
+                "existing packs can omit items, difficulty, tags, startingCharactersOnly and testingOnly");
+            File.WriteAllText(path, valid.Replace("\"startingCharactersOnly\": false", "\"startingCharactersOnly\": true"));
+            Check(OriginCatalog.ReadFile(path).All(origin => origin.StartingCharactersOnly),
+                "JSON true survives validation as a start-only origin rule");
+            Check(!OriginCatalog.ReadFile(Path.Combine(repo, "examples/ExtraOrigins/originform.json")).Single().StartingCharactersOnly,
+                "the distributable example explicitly allows both starters and recruits");
+            var tagged = new OriginJson { Id = "test.tagged", Name = "Extra", Description = "External pack", Bonuses = [],
+                Tags = [" Custom tag ", "CUSTOM TAG", "Another"] }.Validate();
+            Check(tagged.Tags.SequenceEqual(["Custom tag", "Another"]), "tags trim whitespace and collapse case-insensitive duplicates");
+            var combined = new OriginCatalog([.. catalog.All, tagged]);
+            var ids = combined.All.Select(origin => origin.Id).ToArray();
+            Check(OriginBrowser.Tags(combined).Contains("Custom tag")
+                && OriginBrowser.Filter(combined, "EXTERNAL", "custom TAG").Single().Id == tagged.Id,
+                "external packs contribute arbitrary tags and searchable descriptions to the browser");
+            Check(OriginBrowser.Filter(combined, "", "").Select(origin => origin.Name)
+                .SequenceEqual(combined.All.Select(origin => origin.Name).Order(StringComparer.OrdinalIgnoreCase))
+                && combined.All.Select(origin => origin.Id).SequenceEqual(ids),
+                "alphabetical menu presentation never reorders the catalog used by saves and drafts");
         }
 
         void CheckLifecycle()
@@ -222,6 +278,117 @@ internal static class PrototypeChecks
                 "Random persists the resolved stable origin ID rather than a random placeholder");
         }
 
+        void CheckStartOnlyOrigins()
+        {
+            var restricted = catalog.All[0] with { StartingCharactersOnly = true };
+            var ordinary = catalog.All[1] with { StartingCharactersOnly = false };
+            var pool = new OriginCatalog([restricted, ordinary]);
+            var system = new OriginSystem(pool, RngPurpose.Test, logs.Add);
+            using var world = MakeWorld(system);
+            var starter = Spawn(world, "Exclusive starter", true);
+            var recruit = Spawn(world, "Future recruit", false);
+            world.Player.InCreation = true;
+            system.Ready(world, false);
+            Cold(world, starter).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] = 0;
+            var duringCreation = Spawn(world, "Late creation spawn", true);
+            system.Reconcile(world);
+            world.Player.InCreation = false;
+            system.Reconcile(world);
+            Check(system.Views[starter].Name == restricted.Name && Cold(world, starter).Stats!.Strength == 4,
+                "manually selected start-only origin applies to an initial-roster character");
+            Cold(world, recruit).IsPlayer = true;
+            var later = Enumerable.Range(0, 20).Select(i => Spawn(world, "Later spawn " + i, true)).ToArray();
+            system.Reconcile(world);
+            Check(later.Append(recruit).Append(duringCreation).All(id => system.Views[id].Name == ordinary.Name
+                && Cold(world, id).Stats!.Athletics == 6),
+                "recruits and player spawns outside the initial roster roll only eligible origins and receive their bonuses");
+
+            // A one-entry pool guarantees that creation Random can still resolve a restricted origin.
+            var exclusivePool = new OriginCatalog([restricted]);
+            var exclusive = new OriginSystem(exclusivePool, RngPurpose.Test, logs.Add);
+            using var exclusiveWorld = MakeWorld(exclusive);
+            var lucky = Spawn(exclusiveWorld, "Random starter", true);
+            exclusiveWorld.Player.InCreation = true;
+            exclusive.Ready(exclusiveWorld, false);
+            Check(exclusive.Views[lucky].Name == restricted.Name && exclusive.Views[lucky].Pending,
+                "random creation defaults include start-only origins");
+            Cold(exclusiveWorld, lucky).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] = exclusivePool.All.Count;
+            exclusiveWorld.Player.InCreation = false;
+            var excluded = Spawn(exclusiveWorld, "No eligible origin", true);
+            exclusive.Reconcile(exclusiveWorld);
+            exclusive.Reconcile(exclusiveWorld);
+            Check(exclusive.Views[lucky].Name == restricted.Name && !exclusive.Views[lucky].Pending,
+                "creation Random resolves from the full pool including start-only origins");
+            Check(!exclusive.Views.ContainsKey(excluded) && Cold(exclusiveWorld, excluded).Stats!.Modifiers.All.Count == 0
+                && logs.Any(line => line.Contains("All loaded origins are startingCharactersOnly")),
+                "an empty recruit pool skips assignment safely with a diagnostic");
+
+            // Changing eligibility governs future rolls, not IDs already recorded in saves.
+            var restored = new OriginSystem(new OriginCatalog([restricted, ordinary with { StartingCharactersOnly = true }]),
+                RngPurpose.Test, logs.Add);
+            restored.Read(new MemoryStream(Save(system)));
+            using var loaded = MakeWorld(restored);
+            var veteran = Spawn(loaded, "Saved recruit", true);
+            typeof(CharacterCold).GetProperty("LastingId")!.SetValue(Cold(loaded, veteran), Cold(world, recruit).LastingId);
+            var existing = Spawn(loaded, "Existing unassigned character", true);
+            restored.Ready(loaded, true);
+            Check(restored.Views[veteran].Name == ordinary.Name && Cold(loaded, veteran).Stats!.Athletics == 6,
+                "saved recruit assignments survive a later change to start-only eligibility");
+            Check(!restored.Views.ContainsKey(existing), "installing on an existing save respects the recruit eligibility rule");
+
+            using var unrestrictedWorld = MakeWorld(new OriginSystem(new OriginCatalog([ordinary]), RngPurpose.Test, logs.Add));
+            using var restrictedWorld = MakeWorld(new OriginSystem(new OriginCatalog([ordinary with { StartingCharactersOnly = true }]),
+                RngPurpose.Test, logs.Add));
+            Check(unrestrictedWorld.StateHash() != restrictedWorld.StateHash(),
+                "eligibility content participates in deterministic state hashes");
+        }
+
+        void CheckTestingOrigins()
+        {
+            var normal = catalog.All[0];
+            var testing = catalog.All[1] with { TestingOnly = true, StartingCharactersOnly = false };
+            var pool = new OriginCatalog([testing, normal]);
+            var system = new OriginSystem(pool, RngPurpose.Test, logs.Add);
+            using var world = MakeWorld(system);
+            var starters = Enumerable.Range(0, 20).Select(i => Spawn(world, "Random default " + i, true)).ToArray();
+            world.Player.InCreation = true;
+            system.Ready(world, false);
+            Check(starters.All(id => system.Views[id].Name == normal.Name),
+                "testing origins never appear as random creation defaults");
+            foreach (var id in starters)
+                Cold(world, id).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] = pool.All.Count;
+            world.Player.InCreation = false;
+            system.Reconcile(world);
+            var recruits = Enumerable.Range(0, 20).Select(i => Spawn(world, "Random recruit " + i, true)).ToArray();
+            system.Reconcile(world);
+            Check(starters.Concat(recruits).All(id => system.Views[id].Name == normal.Name),
+                "creation Random and recruits exclude testing origins even without startingCharactersOnly");
+
+            var onlyTesting = new OriginSystem(new OriginCatalog([testing]), RngPurpose.Test, logs.Add);
+            using var testWorld = MakeWorld(onlyTesting);
+            var manual = Spawn(testWorld, "Manual choice", true);
+            testWorld.Player.InCreation = true;
+            onlyTesting.Ready(testWorld, false);
+            Check(onlyTesting.Views[manual].Name == "Random" && onlyTesting.Views[manual].Pending,
+                "a testing-only catalog safely leaves the default unassigned");
+            testWorld.Player.InCreation = false;
+            onlyTesting.Reconcile(testWorld);
+            Check(!onlyTesting.Views.ContainsKey(manual), "an empty normal pool cannot automatically assign a testing origin");
+            Cold(testWorld, manual).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] = 0;
+            onlyTesting.Reconcile(testWorld);
+            Check(onlyTesting.Views[manual].Name == testing.Name && onlyTesting.Views[manual].TestingOnly,
+                "explicit manual selection still assigns a testing origin and publishes its warning flag");
+            byte[] saved = Save(onlyTesting);
+            var restored = new OriginSystem(new OriginCatalog([testing]), RngPurpose.Test, logs.Add);
+            restored.Read(new MemoryStream(saved));
+            using var loaded = MakeWorld(restored);
+            var same = Spawn(loaded, "Saved tester", true);
+            typeof(CharacterCold).GetProperty("LastingId")!.SetValue(Cold(loaded, same), Cold(testWorld, manual).LastingId);
+            restored.Ready(loaded, true);
+            Check(restored.Views[same].TestingOnly && restored.Views[same].Name == testing.Name,
+                "saved manual testing assignments remain valid on load");
+        }
+
         void CheckCombatOrigins()
         {
             foreach (string originId in new[] { "kenshiorigins.soldier", "kenshiorigins.gunner", "kenshiorigins.assassin" })
@@ -245,8 +412,10 @@ internal static class PrototypeChecks
         void CheckUi()
         {
             var harmony = new Harmony("kenshiorigins.checks");
-            OriginUi.Install(harmony, catalog, logs.Add);
-            var system = new OriginSystem(catalog, RngPurpose.Test, logs.Add, new ItemFactory(db, GameConstants.Default));
+            var uiCatalog = new OriginCatalog(catalog.All.Select(origin => origin.Id == "kenshiorigins.soldier"
+                ? origin with { TestingOnly = true } : origin));
+            OriginUi.Install(harmony, uiCatalog, logs.Add);
+            var system = new OriginSystem(uiCatalog, RngPurpose.Test, logs.Add, new ItemFactory(db, GameConstants.Default));
             using var session = new WorldSession(Vector3.Zero, (-100, -100, 100, 100), (_, _) => 0,
                 simulation: new WorldSettings { Seed = 918273 }, systems: [new PlayerSystem(), system]);
             var world = session.World;
@@ -310,7 +479,7 @@ internal static class PrototypeChecks
             ((Dictionary<CharacterId, CharacterDraft>)AccessTools.Property(openingType, "Drafts").GetValue(opening)!)[id] = draft;
             AccessTools.Field(playerType, "Width").SetValue(player, 1280);
             AccessTools.Field(playerType, "Height").SetValue(player, 900);
-            CreationPanelChecks.Run(catalog, db, session, player, editor, draft, id, uiRoot, Check);
+            CreationPanelChecks.Run(uiCatalog, db, session, player, editor, draft, id, uiRoot, Check, theme, preview);
             harmony.UnpatchAll(harmony.Id);
         }
 

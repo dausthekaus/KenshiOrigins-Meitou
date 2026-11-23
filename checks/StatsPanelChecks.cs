@@ -49,7 +49,11 @@ internal static class StatsPanelChecks
             "stats screen displays the saved character's origin difficulty label");
         var resources = (MyGuiResources)AccessTools.Field(playerType, "UiResources").GetValue(player)!;
         check(frame.Single(c => c.Name == "kenshiorigins.stats-story").Properties["TextColour"]
-            == MyGuiColours.TemplateInk(resources, "Kenshi_GenericTextBoxSkin"), "origin story uses the native description text colour");
+            == (origin.TestingOnly ? OriginUi.TestingInk : MyGuiColours.TemplateInk(resources, "Kenshi_GenericTextBoxSkin")),
+            "testing stories use red text while normal stories follow the theme");
+        check(!origin.TestingOnly || frame.Where(c => c.Name.StartsWith("kenshiorigins.", StringComparison.Ordinal))
+            .All(c => c.Properties.GetValueOrDefault("TextColour") == OriginUi.TestingInk),
+            "the testing origin name, bonuses and story all use red text in stats");
 
         var skill = frame.First(c => c.Action == "stat:" + (int)StatsEnumerated.Strength);
         Click(skill);
@@ -78,6 +82,9 @@ internal static class StatsPanelChecks
         check(origin.Description != otherOrigin.Description
             && frame.Single(c => c.Name == "kenshiorigins.stats-story").Caption == otherOrigin.Description,
             "changing the selected character refreshes the origin story");
+        check(frame.Single(c => c.Name == "kenshiorigins.stats-story").Properties["TextColour"]
+            == (otherOrigin.TestingOnly ? OriginUi.TestingInk : MyGuiColours.TemplateInk(resources, "Kenshi_GenericTextBoxSkin")),
+            "changing to a normal character restores the theme's stats text colour");
         world.Player.Selection.Clear();
         world.Player.Selection.Add(character);
         AccessTools.Method(typeof(World), "PublishPaused").Invoke(world, null);

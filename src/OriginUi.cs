@@ -17,6 +17,7 @@ namespace KenshiOrigins;
 internal static class OriginUi
 {
     internal const string OriginStat = "kenshiorigins.origin";
+    internal const string TestingInk = "#E05050";
     private static Action<string> s_log = null!;
     private static FieldInfo s_session = null!, s_statsPlayer = null!, s_selectedStat = null!, s_uiResources = null!;
     private static MethodInfo s_selected = null!, s_publishPaused = null!;
@@ -110,7 +111,8 @@ internal static class OriginUi
         if (available < 24 * scale) return;
         var box = new UiRect(panel.Bounds.X + 4 * scale, top, panel.Bounds.Width - 8 * scale, available);
         int pixels = Math.Max(8, (int)(13 * scale));
-        string ink = MyGuiColours.TemplateInk((MyGuiResources)s_uiResources.GetValue(player)!, "Kenshi_GenericTextBoxSkin");
+        string ink = view.TestingOnly ? TestingInk
+            : MyGuiColours.TemplateInk((MyGuiResources)s_uiResources.GetValue(player)!, "Kenshi_GenericTextBoxSkin");
         var clip = panel.Bounds.Intersect(panel.Clip ?? panel.Bounds);
         var heading = box with { Height = Math.Min(20 * scale, box.Height) };
         AddText(controls, "stats", heading, $"Origin: {view.Name}", pixels, Vector4.Zero, clip, ink);

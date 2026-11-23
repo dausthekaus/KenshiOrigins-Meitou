@@ -31,12 +31,17 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
 
     public void Ready(World world, bool fromSave)
     {
+        if (catalog.RecruitChoices.Count == 0)
+            log("All loaded origins are startingCharactersOnly or testingOnly; later recruits will remain without an origin.");
+        if (catalog.StartingRandomChoices.Count == 0)
+            log("All loaded origins are testingOnly; starting characters must choose an origin manually.");
         if (!fromSave)
         {
             foreach (var id in SquadManagement.PlayerSquads(world).SelectMany(s => s.Members))
             {
                 if (!world.Characters.TryResolveNext(id, out int slot) || world.Characters.Cold(slot) is not { } cold) continue;
-                int choice = RandomChoice(world, id);
+                int choice = RandomChoice(world, id, isStarter: true);
+                if (choice < 0) choice = catalog.All.Count; // Leave Random unassigned until a manual choice.
                 _startingChoices[id] = choice;
                 // The per-character rolled look is copied into the editor draft. Never write a shared body-file record.
                 if (cold.Appearance?.Loadout?.Appearance.Record is { } look)
@@ -68,13 +73,17 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
             {
                 if (world.Player.InCreation)
                 {
-                    if (_startingChoices.TryGetValue(id, out int pending)) views[id] = View(catalog.All[pending], pending: true);
+                    if (_startingChoices.TryGetValue(id, out int pending)) views[id] = pending < catalog.All.Count
+                        ? View(catalog.All[pending], pending: true)
+                        : new OriginView("Random", "No origins are eligible for random assignment. Choose an origin manually.", "No bonuses applied", true);
                     continue;
                 }
 
                 bool isStarter = _startingChoices.TryGetValue(id, out int initial);
-                int choice = isStarter ? ReadChoice(cold.Appearance?.Loadout?.Appearance.Record, initial) : RandomChoice(world, id);
-                if (choice == catalog.All.Count) choice = RandomChoice(world, id);
+                int choice = isStarter ? ReadChoice(cold.Appearance?.Loadout?.Appearance.Record, initial)
+                    : RandomChoice(world, id, isStarter: false);
+                if (choice == catalog.All.Count) choice = RandomChoice(world, id, isStarter: true);
+                if (choice < 0) continue; // No eligible recruit origin; never fall back to a start-only one.
                 var origin = catalog.All[choice];
                 originId = origin.Id;
                 var lasting = world.LastingIds.GetOrGive(id);
@@ -140,14 +149,19 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
         return (uint)value <= catalog.All.Count ? value : fallback;
     }
 
-    private int RandomChoice(World world, CharacterId id) =>
-        (int)(Rng.Hash(world.Seed, Rng.Key(id), randomPurpose) % (ulong)catalog.All.Count);
+    private int RandomChoice(World world, CharacterId id, bool isStarter)
+    {
+        var choices = isStarter ? catalog.StartingRandomChoices : catalog.RecruitChoices;
+        if (choices.Count == 0) return -1;
+        int roll = (int)(Rng.Hash(world.Seed, Rng.Key(id), randomPurpose) % (ulong)choices.Count);
+        return choices[roll];
+    }
 
     internal OriginView Preview(OriginDefinition origin) => View(origin, pending: true);
 
     private OriginView View(OriginDefinition origin, bool pending) => new(origin.Name, origin.Description, origin.BonusSummary, pending,
         origin.Difficulty, origin.Items.Count == 0 ? "None" : string.Join(", ", origin.Items.Select(item =>
-            $"{item.Quantity} × {items?.Db.Find(item.Record)?.Name ?? "Unavailable item"}")));
+            $"{item.Quantity} × {items?.Db.Find(item.Record)?.Name ?? "Unavailable item"}")), TestingOnly: origin.TestingOnly);
 
     /// <summary>Assignments persist by lasting ID; runtime modifiers and the temporary roster do not.</summary>
     public void Write(Stream stream)
@@ -194,6 +208,8 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
         foreach (var definition in catalog.All)
         {
             hasher.Add(Rng.StableHash(definition.Id));
+            hasher.Add(definition.StartingCharactersOnly ? 1 : 0);
+            hasher.Add(definition.TestingOnly ? 1 : 0);
             foreach (var (stat, amount) in definition.Bonuses.OrderBy(b => b.Key))
             {
                 hasher.Add((int)stat);
@@ -231,4 +247,4 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
 }
 
 internal sealed record OriginView(string Name, string Description, string Bonuses, bool Pending,
-    string Difficulty = "Unrated", string Items = "None", int ItemsWaiting = 0);
+    string Difficulty = "Unrated", string Items = "None", int ItemsWaiting = 0, bool TestingOnly = false);

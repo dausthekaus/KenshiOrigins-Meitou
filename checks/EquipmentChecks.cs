@@ -223,7 +223,7 @@ internal static class EquipmentChecks
             var pack = new Inventory();
             var character = new CharacterCold { IsPlayer = true, Inventory = pack };
             var grants = new OriginEquipment(nativeFactory, logs.Add).Deliver(character, definition.Items);
-            check(definition.Items.Count > 0 && definition.Items.All(i => core.Find(i.Record) is not null)
+            check(definition.Items.All(i => core.Find(i.Record) is not null)
                 && grants.Length == 0 && pack.Items.All(i => i.Section == "main")
                 && pack.Items.Sum(i => i.Quantity) == definition.Items.Sum(i => i.Quantity),
                 $"{definition.Name}'s actual vanilla item records all fit unequipped in an empty inventory");

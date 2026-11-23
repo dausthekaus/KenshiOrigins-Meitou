@@ -8,6 +8,10 @@ namespace KenshiOrigins;
 internal sealed record OriginDefinition(string Id, string Name, string Description, IReadOnlyDictionary<StatsEnumerated, float> Bonuses,
     IReadOnlyList<OriginItem> Items, string Difficulty)
 {
+    internal IReadOnlyList<string> Tags { get; init; } = [];
+    internal bool StartingCharactersOnly { get; init; }
+    internal bool TestingOnly { get; init; }
+
     internal string BonusSummary => Bonuses.Count == 0 ? "No stat bonuses" : string.Join(", ", Bonuses.OrderBy(b => b.Key)
         .Select(b => $"{b.Value.ToString("+0.##;-0.##;0", CultureInfo.InvariantCulture)} {StatName(b.Key)}"));
 
@@ -27,6 +31,9 @@ internal sealed class OriginJson
     public string? Name { get; init; }
     public string? Description { get; init; }
     public string? Difficulty { get; init; }
+    public List<string>? Tags { get; init; }
+    public bool StartingCharactersOnly { get; init; }
+    public bool TestingOnly { get; init; }
     public Dictionary<string, float>? Bonuses { get; init; }
     public List<OriginItemJson>? Items { get; init; }
 
@@ -49,8 +56,14 @@ internal sealed class OriginJson
         }
         var items = Items?.Select(item => item?.Validate()
             ?? throw new InvalidDataException($"Origin '{Id}' has a null item.")).ToArray() ?? [];
+        var tags = Tags?.Select(tag => string.IsNullOrWhiteSpace(tag)
+            ? throw new InvalidDataException($"Origin '{Id}' has an empty tag.") : tag.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? [];
         return new OriginDefinition(Id, Name.Trim(), Description.Trim(), resolved.AsReadOnly(), Array.AsReadOnly(items),
-            string.IsNullOrWhiteSpace(Difficulty) ? "Unrated" : Difficulty.Trim());
+            string.IsNullOrWhiteSpace(Difficulty) ? "Unrated" : Difficulty.Trim())
+        {
+            Tags = Array.AsReadOnly(tags), StartingCharactersOnly = StartingCharactersOnly, TestingOnly = TestingOnly
+        };
     }
 }
 

@@ -12,15 +12,18 @@ if len(sys.argv) > 1:
     command.append(f"-p:MeitouDirectory={Path(sys.argv[1]).resolve(strict=True)}")
 subprocess.run(command, check=True)
 version = json.loads((repo / "meitou.json").read_text())["version"]
+references = ("ORIGIN_GUIDE.md", "VANILLA_ITEMS.md", "VANILLA_ITEMS.csv")
 destination = repo / f"artifacts/KenshiOrigins-{version}.zip"
 destination.parent.mkdir(exist_ok=True)
 with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
-    for name in ("KenshiOrigins.mod", "meitou.json", "originform.json", "LICENSE", "README.md"):
+    for name in ("KenshiOrigins.mod", "meitou.json", "originform.json", "LICENSE", "README.md", *references):
         archive.write(repo / name, f"KenshiOrigins/{name}")
     archive.write(repo / "bin/Release/net11.0/KenshiOrigins.dll", "KenshiOrigins/KenshiOrigins.dll")
 print(destination)
 example = repo / "artifacts/ExtraOrigins-example.zip"
 with zipfile.ZipFile(example, "w", zipfile.ZIP_DEFLATED) as archive:
+    for name in references:
+        archive.write(repo / name, f"ExtraOrigins/{name}")
     for source in sorted((repo / "examples/ExtraOrigins").iterdir()):
         if source.is_file():
             archive.write(source, f"ExtraOrigins/{source.name}")

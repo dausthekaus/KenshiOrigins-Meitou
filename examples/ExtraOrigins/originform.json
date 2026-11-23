@@ -3,9 +3,14 @@
   "origins": [
     {
       "id": "extraorigins.dockworker",
+      "startingCharactersOnly": false,
+      "testingOnly": false,
       "name": "Dockworker",
       "description": "Shifting cargo and working by the water kept you busy.",
-      "bonuses": { "Labouring": 3, "Swimming": 2 }
+      "difficulty": "Standard",
+      "tags": ["Civilian", "Labouring"],
+      "bonuses": { "Labouring": 3, "Swimming": 2 },
+      "items": []
     }
   ]
 }
