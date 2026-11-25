@@ -1,6 +1,6 @@
 # Kenshi Origins prototype
 
-C# code mod for **MeitouClient 0.22.2-nightly.20261122.2**. It gives each player character an origin with additive stat bonuses and optional starting items.
+C# code mod for **MeitouClient 0.23.2**. It gives each player character an origin with additive stat bonuses and optional starting items. Version 0.4.0 targets this release; its manifest does not claim compatibility with older builds.
 
 Start a new game and use the compact **Origin / Race** mode button at the upper left of the description panel. **Origin** opens by default with search beside the button, the origin selector underneath, a horizontal row of tag buttons, and a scrollable description below. Move the mouse wheel over the tags to scroll sideways, or use the horizontal scrollbar; **All tags** clears the category filter. Origin mode expands into the race-stat area for more reading space. **Race** restores the original race description and race stats.
 
@@ -10,7 +10,7 @@ Selecting an origin immediately keeps it in that character's creation draft; the
 
 The stats window shows the assigned origin beneath the attributes. Its story and bonuses appear in the lower description panels when the window opens. Hover or click a skill for its usual help; hover or click the **Origin** entry to return to the story. This also works for origins supplied by other packs.
 
-The standalone pool includes these thirteen origins:
+The standalone pool includes these eighteen origins:
 
 | Origin | Bonuses | Starting items |
 | --- | --- | --- |
@@ -27,6 +27,15 @@ The standalone pool includes these thirteen origins:
 | Miner | +15 Labouring, +5 Strength, +3 Toughness | Iron Club |
 | Field Medic | +20 Medic, +5 Athletics | Standard first aid kit and Splint Kit |
 | The Unfair One | +75 physical/combat stats, +50 other skills (34 distinct supported stats) | None |
+| Scientist | +30 Science, +15 Robotics, +10 Engineering | Ancient Science Book |
+| Engineer | +20 Engineering, +8 Labouring, +5 Science, +5 Strength | 2 Electrical Components and 2 Building Material |
+| The Forgotten Veteran | +25 Toughness, +15 Melee Defence, +15 Melee Attack, +10 Strength, +5 Dexterity, +5 Medic | Low-quality Longsword and Standard first aid kit |
+| Seasoned Wanderer | +15 Athletics, +12 Toughness, +8 Swimming, +8 Medic, +8 Stealth, +5 Lockpicking, +5 Cooking | Wooden Backpack, 3 Dried Meat and Basic First Aid Kit |
+| Adventurous Innkeeper | +25 Cooking, +5 Strength, +5 Farming, +3 Melee Defence | 2 Foodcube and 2 Bread |
+
+The five new origins are available for manual creation, random starting choices and normal recruitment. The Forgotten Veteran is intentionally the strongest legitimate combat origin; the Seasoned Wanderer is a survival generalist without direct combat-skill bonuses. No negative bonuses are used in the official pack.
+
+Official categories are **Combat**, **Civilian**, **Technical**, **Survival** and **Special**. The menu selects one category at a time; an origin tagged Combat and Survival appears under either button. **All tags** is a UI control rather than a tag stored in an origin. The six buttons fit in the horizontal menu at 1920×1080 and 1280×720; smaller screens and additional pack categories can scroll. New packs can still define their own tags. For example, the bundled ExtraOrigins pack explicitly adds Labouring; that tag appears only when a contributing pack is loaded.
 
 **Nobody** is available only for the initial roster. **The Unfair One** is a cheat origin for testing: its text is red in the selector, creation details and stats, and it requires manual selection. It never appears in random creation defaults, creation's Random rolls or later recruits. Its warnings are also written in its story.
 
@@ -43,7 +52,7 @@ dotnet build KenshiOrigins.csproj -c Release
 python3 scripts/package.py
 ```
 
-Extract `artifacts/KenshiOrigins-0.3.3.zip` into your **Kenshi installation's `mods` directory**. Enable KenshiOrigins in the launcher and restart the client. Keep `KenshiOrigins.mod`, `meitou.json`, `KenshiOrigins.dll` and `originform.json` together in `mods/KenshiOrigins/`.
+Extract `artifacts/KenshiOrigins-0.4.0.zip` into your **Kenshi installation's `mods` directory**. Enable KenshiOrigins in the launcher and restart the client. Keep `KenshiOrigins.mod`, `meitou.json`, `KenshiOrigins.dll` and `originform.json` together in `mods/KenshiOrigins/`.
 
 The package script also creates `artifacts/ExtraOrigins-example.zip`. Extract it into the same `mods` directory and enable it after KenshiOrigins to try the sample Dockworker origin. Its JSON includes all supported fields as a template for your own pack. Neither ZIP includes game DLLs.
 
@@ -122,33 +131,37 @@ Bonuses use one named modifier source. Setting that source replaces its previous
 On Linux, run the headless checks with the release's own bundled runtime and Harmony:
 
 ```sh
-python3 scripts/check.py /path/to/Meitou/versions/0.22.2-nightly.20261122.2
+python3 scripts/check.py /path/to/Meitou/versions/0.23.2
 ```
 
 They exercise dependent-pack discovery, validation, multiple custom starting squads, start-only eligibility (including Random, empty recruit pools and saved assignments), deferred starter equipment, recruits and later player spawns receiving bonuses without gear, partial inventory delivery, backpack storage, save migration, replacement stats, persistence with changed runtime IDs, missing definitions, paused confirmation, real editor/stats hooks, deterministic hashes and the real mod loader in an isolated process. They use synthetic game data and do not modify the installed game or saves.
 
 The interaction checks use a fixed fixture so story and balance edits do not alter their assumptions. The current authored definitions are checked separately through real assignment, inventory delivery, recruitment and save/load; The Unfair One's full +75/+50 stat coverage is checked against the installed enum. Testing-only origins are also checked for manual selection, random exclusion and red native UI text.
 
+Expansion checks verify the exact eighteen-origin roster, official tag assignments, new random-pool membership, nonnegative bonuses and preservation of the previous thirteen definitions except their tags. Saves made with that previous catalog are loaded with the expanded catalog to check stable assignments, non-stacking bonuses and no retroactive equipment grants.
+
 To validate another candidate without deploying or replacing the bundled JSON:
 
 ```sh
-python3 scripts/check.py /path/to/Meitou/versions/0.22.2-nightly.20261122.2 --ui-root /path/to/Kenshi --validate-origins /path/to/originform.json
+python3 scripts/check.py /path/to/Meitou/versions/0.23.2 --ui-root /path/to/Kenshi --validate-origins /path/to/originform.json
 ```
 
 Pass `--ui-root /path/to/Kenshi` to exercise the installed native editor layout and templates as well: mouse/keyboard dropdown selection including Random, search typing and Enter handling, horizontal tag scrolling and filtering, automatic draft saving, character/view switching, difficulty labels, scrolling and panel bounds at three resolutions. It also checks all bundled item IDs against the installed vanilla database and verifies the Gunner's ammunition. These checks use the game's screen router, including its disabled-by-default button bindings, and read assets without copying them into the project.
+
+Add `--core-ui` to exercise the actual expanded official catalog in the native editor, including all five categories, either-category matching, alphabetical sorting, search, new-origin selection, the cheat warning and tag-button bounds. Add `--extra-pack-ui` alongside it to include the example pack and check its custom category through the same native controls.
 
 Add `--ui-theme /path/to/Dark-UI-mod` to test an installed theme's layouts and skins over the base assets. Add `--render-ui` to render a preview through the release's actual Vulkan painter, fonts and textures; this requires a Vulkan device and writes `artifacts/origin-ui.png` (or `origin-ui-theme.png` with a theme). The browser follows the theme's sidebar anchors and uses compact UI-scaled rows, a native Kenshi horizontal scrollbar, and a single caption for the origin selector.
 
 To regenerate the two empty `.mod` headers using Meitou's own writer:
 
 ```sh
-python3 scripts/check.py /path/to/Meitou/versions/0.22.2-nightly.20261122.2 --generate
+python3 scripts/check.py /path/to/Meitou/versions/0.23.2 --generate
 ```
 
 To regenerate the bundled vanilla item reference after a game-data update:
 
 ```sh
-python3 scripts/check.py /path/to/Meitou/versions/0.22.2-nightly.20261122.2 --ui-root /path/to/Kenshi --export-vanilla-items
+python3 scripts/check.py /path/to/Meitou/versions/0.23.2 --ui-root /path/to/Kenshi --export-vanilla-items
 ```
 
 This export reads only the fixed core file list, validates each listed record through the installed release's item factory, checks bundled origin grants are covered, and writes `VANILLA_ITEMS.md` and `VANILLA_ITEMS.csv`. It does not modify the installation or run gameplay checks. Source version and file hashes are recorded in the reference.
@@ -159,6 +172,6 @@ This export reads only the fixed core file list, validates each listed record th
 - Installing on an existing save assigns random origins to existing player characters. An import starts fresh origin assignments, as the engine resets lasting IDs and mod sidecars on import.
 - If a saved origin's pack is missing, its ID is retained and displayed as unavailable, with no origin bonuses. Restoring the pack restores its bonuses on the next load. Changes to an origin definition take effect after restarting and loading.
 - No quirks or race-specific origin pools yet. Creation's random selection excludes testing-only definitions; later characters also exclude start-only origins. Debt, past crimes and similar story details are flavour text without additional mechanics.
-- The UI hooks target this exact nightly. Headless controls are checked; visual layout and full vanilla/modded Game Start playtesting still need an in-game pass.
+- The UI hooks target MeitouClient 0.23.2. Native controls and rendered previews are checked; full vanilla/modded Game Start playtesting still needs an in-game pass.
 
-API reference: [Meitou documentation at the target build](https://github.com/VlcekM/MeitouClient/blob/v0.22.2-nightly.20261122.2/docs/modding.md).
+API reference: [Meitou documentation at the target build](https://github.com/VlcekM/MeitouClient/blob/v0.23.2/docs/modding.md).

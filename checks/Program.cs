@@ -81,12 +81,14 @@ internal static class PrototypeChecks
         {
             CheckDiscovery();
             CheckValidation();
+            CoreExpansionChecks.Run(repo, bundled, Check);
             CheckLifecycle();
             CheckStartOnlyOrigins();
             CheckTestingOrigins();
             CheckCombatOrigins();
             EquipmentChecks.Run(bundled, uiRoot, Check);
-            if (uiRoot is not null) OriginContentChecks.Run(bundled, uiRoot, Check);
+            if (uiRoot is not null) OriginContentChecks.Run(bundled, uiRoot, Check,
+                new OriginCatalog(OriginCatalog.ReadFile(Path.Combine(fixtures, "core-v0.3.3.json"))));
             CheckUi();
             Check(DeterministicHash(1) == DeterministicHash(4), "assignments and hashes agree with one and four worker threads");
             Console.WriteLine($"PASS: {assertions} assertions against {typeof(IMod).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion}.");
@@ -412,8 +414,11 @@ internal static class PrototypeChecks
         void CheckUi()
         {
             var harmony = new Harmony("kenshiorigins.checks");
-            var uiCatalog = new OriginCatalog(catalog.All.Select(origin => origin.Id == "kenshiorigins.soldier"
-                ? origin with { TestingOnly = true } : origin));
+            bool coreUi = args.Contains("--core-ui");
+            var uiCatalog = coreUi ? new OriginCatalog([.. bundled.All, .. (args.Contains("--extra-pack-ui")
+                ? OriginCatalog.ReadFile(Path.Combine(repo, "examples/ExtraOrigins/originform.json")) : [])])
+                : new OriginCatalog(catalog.All.Select(origin => origin.Id == "kenshiorigins.soldier"
+                    ? origin with { TestingOnly = true } : origin));
             OriginUi.Install(harmony, uiCatalog, logs.Add);
             var system = new OriginSystem(uiCatalog, RngPurpose.Test, logs.Add, new ItemFactory(db, GameConstants.Default));
             using var session = new WorldSession(Vector3.Zero, (-100, -100, 100, 100), (_, _) => 0,
@@ -426,9 +431,9 @@ internal static class PrototypeChecks
             world.Player.InCreation = true;
             world.TellReady(false);
             Cold(world, id).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] =
-                catalog.IndexOf("kenshiorigins.soldier");
+                uiCatalog.IndexOf("kenshiorigins.soldier");
             Cold(world, companion).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] =
-                catalog.IndexOf("kenshiorigins.assassin");
+                uiCatalog.IndexOf("kenshiorigins.assassin");
             world.Commands.Enqueue(new FinishCreation { Tick = world.Tick });
             world.ApplyPausedInterfaceCommands();
             Check(!world.Player.InCreation && !system.Views[id].Pending, "real paused FinishCreation triggers assignment through the Harmony bridge");
@@ -479,7 +484,7 @@ internal static class PrototypeChecks
             ((Dictionary<CharacterId, CharacterDraft>)AccessTools.Property(openingType, "Drafts").GetValue(opening)!)[id] = draft;
             AccessTools.Field(playerType, "Width").SetValue(player, 1280);
             AccessTools.Field(playerType, "Height").SetValue(player, 900);
-            CreationPanelChecks.Run(uiCatalog, db, session, player, editor, draft, id, uiRoot, Check, theme, preview);
+            CreationPanelChecks.Run(uiCatalog, db, session, player, editor, draft, id, uiRoot, Check, theme, preview, coreUi);
             harmony.UnpatchAll(harmony.Id);
         }
 

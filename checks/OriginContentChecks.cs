@@ -14,7 +14,7 @@ using Meitou.Simulation.Population;
 /// <summary>Checks authored content against the installed enum, vanilla items and real assignment system.</summary>
 internal static class OriginContentChecks
 {
-    internal static void Run(OriginCatalog catalog, string install, Action<bool, string> check)
+    internal static void Run(OriginCatalog catalog, string install, Action<bool, string> check, OriginCatalog? previous = null)
     {
         var database = new GameDatabase();
         foreach (string name in LoadOrder.BaseFiles)
@@ -90,6 +90,46 @@ internal static class OriginContentChecks
                 $"{definition.Name}: save/load restores its origin and bonuses without duplicating equipment");
         }
         Console.WriteLine($"Validated {catalog.All.Count} origins against the installed runtime and vanilla database.");
+        if (previous is not null)
+        {
+            var oldSystem = new OriginSystem(previous, RngPurpose.Test, _ => { }, factory);
+            using var oldWorld = MakeWorld(oldSystem);
+            var oldCharacters = previous.All.Select(_ => Spawn(oldWorld, true, race)).ToArray();
+            oldWorld.Player.InCreation = true;
+            oldSystem.Ready(oldWorld, false);
+            for (int i = 0; i < oldCharacters.Length; i++)
+                Cold(oldWorld, oldCharacters[i]).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] = i;
+            oldWorld.Player.InCreation = false;
+            oldSystem.Reconcile(oldWorld);
+            // Already consumed/sold grants must not reappear when the expanded catalog is loaded.
+            foreach (var id in oldCharacters) Cold(oldWorld, id).Inventory!.Items.Clear();
+            using var save = new MemoryStream();
+            oldSystem.Write(save);
+            save.Position = 0;
+            var upgraded = new OriginSystem(catalog, RngPurpose.Test, _ => { }, factory);
+            upgraded.Read(save);
+            using var upgradedWorld = MakeWorld(upgraded);
+            Spawn(upgradedWorld, false, race);
+            var upgradedCharacters = oldCharacters.Select(id =>
+            {
+                var same = Spawn(upgradedWorld, true, race);
+                typeof(CharacterCold).GetProperty("LastingId")!.SetValue(Cold(upgradedWorld, same), Cold(oldWorld, id).LastingId);
+                return same;
+            }).ToArray();
+            upgraded.Ready(upgradedWorld, true);
+            upgraded.Reconcile(upgradedWorld);
+            for (int i = 0; i < upgradedCharacters.Length; i++)
+            {
+                var id = upgradedCharacters[i];
+                var old = previous.All[i];
+                var cold = Cold(upgradedWorld, id);
+                check(upgraded.Views[id].Name == old.Name && upgraded.Views[id].Description == old.Description
+                    && cold.Stats!.Modifiers.All.Count == old.Bonuses.Count
+                    && old.Bonuses.All(b => cold.Stats.Modifiers[b.Key] == b.Value)
+                    && cold.Inventory!.Items.Count == 0 && upgraded.Views[id].ItemsWaiting == 0,
+                    $"{old.Name}: pre-expansion save keeps its assigned origin without stacked bonuses or retroactive equipment");
+            }
+        }
     }
 
     private static World MakeWorld(OriginSystem system)

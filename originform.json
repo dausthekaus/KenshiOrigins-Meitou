@@ -8,8 +8,7 @@
       "description": "No remarkable talents, no great achievements, and no reputation worth mentioning.\n\nJust another nobody trying to make a living in a world that couldn't care less.",
       "difficulty": "Hard",
       "tags": [
-        "Vanilla",
-        "Starter"
+        "Special"
       ],
       "bonuses": {},
       "items": [],
@@ -22,7 +21,6 @@
       "description": "No home, no fortune, and no past worth speaking of. Just another wanderer who has spent years travelling across the continent, going wherever the roads would take them.\n\nThey've lived off whatever work they could find, slept beneath the open sky, and learned that sometimes a good pair of legs is worth more than a rusty sword.\n\nTheir travels have brought them to yet another unfamiliar place, carrying little more than worn shoes, a few supplies, and the experience of having survived this long.\n\nFor now, it's as good a place as any to start over.",
       "difficulty": "Standard",
       "tags": [
-        "Travel",
         "Survival"
       ],
       "bonuses": {
@@ -45,8 +43,7 @@
       "description": "Life on the farm was never easy, but there was food on the table and a roof overhead. For a farmer in the wasteland, that was already more than most could ask for.\n\nThen came the raiders.\n\nThe fields were trampled, the buildings set ablaze, and whatever couldn't be carried away was left to burn. Amid the chaos, one farmhand managed to escape with little more than their life.\n\nWith nothing left to harvest and nowhere to return to, they've taken to the roads in search of greener pastures.",
       "difficulty": "Standard",
       "tags": [
-        "Civilian",
-        "Farming"
+        "Civilian"
       ],
       "bonuses": {
         "Farming": 12,
@@ -69,8 +66,8 @@
       "description": "The forge was never a comfortable place to work. Between the scorching heat, choking smoke, and the constant ringing of hammers, even a quiet day could leave an apprentice exhausted.\n\nYears spent feeding furnaces, shaping metal, and tending to the occasional burn taught them the trade, along with a healthy tolerance for pain.\n\nThe work was honest, and the pay was enough to get by. But after years of staring at the same four walls, the thought of spending another lifetime beside the furnace became increasingly difficult to stomach.\n\nSo they saved what little they could, packed their belongings, and left the workshop behind.\n\nThere was a whole continent beyond the forge, after all.",
       "difficulty": "Standard",
       "tags": [
-        "Crafting",
-        "Smithing"
+        "Civilian",
+        "Technical"
       ],
       "bonuses": {
         "SmithingWeapon": 10,
@@ -93,9 +90,8 @@
       "description": "Life on the streets taught this urchin a few valuable lessons: how to find food, avoid trouble, and disappear into a crowd when the guards came looking.\n\nYears of picking pockets and sleeping in forgotten corners taught them how to blend in with the common folk.\n\nThese days, they're just another unremarkable face in a tavern or among the crowds. Whether they've left their old habits behind is anyone's guess.",
       "difficulty": "Standard",
       "tags": [
-        "Stealth",
-        "Thievery",
-        "Civilian"
+        "Civilian",
+        "Survival"
       ],
       "bonuses": {
         "Stealth": 12,
@@ -118,9 +114,7 @@
       "description": "The promise of steady pay, regular meals, and a roof overhead was enough to convince this soldier to enlist.\n\nReality was far less generous. Endless marches, miserable rations, and the horrors of war quickly taught them that military life was no place for the faint of heart.\n\nAfter surviving one battle too many, they decided that no amount of coin was worth dying in some forgotten corner of the wasteland.\n\nOne night, they simply walked away.",
       "difficulty": "Easy",
       "tags": [
-        "Combat",
-        "Melee",
-        "Military"
+        "Combat"
       ],
       "bonuses": {
         "MeleeAttack": 10,
@@ -143,9 +137,7 @@
       "description": "Years of mercenary work have taken this gunner across the wasteland, guarding caravans and settlements with whatever crossbow or turret was available.\n\nThe pay was decent, but contracts rarely lasted, and even a skilled marksman could find themselves hungry between jobs.\n\nTired of chasing work from one settlement to another, they've decided to seek something more permanent.\n\nPreferably somewhere with walls.",
       "difficulty": "Easy",
       "tags": [
-        "Combat",
-        "Ranged",
-        "Mercenary"
+        "Combat"
       ],
       "bonuses": {
         "Crossbows": 12,
@@ -173,9 +165,7 @@
       "description": "For years, this assassin worked for a little-known organization, carrying out contracts that required discretion and a steady hand.\n\nTheir last assignment, however, went terribly wrong. The operation fell apart, and their former associates disappeared in the aftermath.\n\nWith no employer to return to and few questions worth answering, they've taken to looking for work elsewhere.\n\nAfter all, there are always people willing to pay for a quiet death.",
       "difficulty": "Easy",
       "tags": [
-        "Combat",
-        "Stealth",
-        "Criminal"
+        "Combat"
       ],
       "bonuses": {
         "Assassination": 20,
@@ -198,9 +188,8 @@
       "description": "Years of forced labour, meagre rations, and the watchful eyes of guards had made freedom seem like a distant dream.\n\nThen, one day, chaos broke out. Whether they slipped away during the fighting or hid among the cargo, one slave managed to disappear without a trace.\n\nTheir years in captivity left them with little more than calloused hands, a few bruises, and some experience defending themselves without a weapon.\n\nNow free of their chains, they face a world that has never been particularly kind to the unfortunate.",
       "difficulty": "Hard",
       "tags": [
-        "Survival",
-        "Labouring",
-        "Slavery"
+        "Civilian",
+        "Survival"
       ],
       "bonuses": {
         "Labouring": 12,
@@ -217,7 +206,6 @@
       "description": "Years of drinking, petty crime, and tavern brawls have earned this troublemaker a few scars and an impressive collection of unpaid debts.\n\nTheir fists proved useful whenever an argument got out of hand, though their judgment rarely did.\n\nEventually, one brawl went too far, attracting more attention from the local authorities than they could comfortably handle.\n\nRather than face the consequences, they skipped town at the first opportunity.\n\nSome lessons are harder to learn than others.",
       "difficulty": "Standard",
       "tags": [
-        "Criminal",
         "Combat",
         "Survival"
       ],
@@ -236,8 +224,7 @@
       "description": "Years spent digging through rock and hauling ore have left this miner with aching muscles, calloused hands, and a considerable amount of debt.\n\nThe wages were never generous, and whatever little they earned seemed to disappear into the pockets of creditors.\n\nEventually, they decided that spending another lifetime underground wasn't going to solve their problems.\n\nSo they packed their belongings and left the mines behind.\n\nThe debt, unfortunately, didn't leave with them.",
       "difficulty": "Standard",
       "tags": [
-        "Civilian",
-        "Labouring"
+        "Civilian"
       ],
       "bonuses": {
         "Labouring": 15,
@@ -260,9 +247,7 @@
       "description": "Years spent tending to the wounded have taught this medic that war leaves far more broken bodies than heroes.\n\nSoldiers, mercenaries, civilians; the wounded kept coming, and there were never enough supplies or hands to save them all.\n\nEventually, they grew tired of patching up soldiers only to see them sent back to the slaughter.\n\nThey left the battlefield behind, taking what medical supplies they could carry.\n\nThere would always be more blood to spill in the wasteland. Perhaps this time, it could be for a cause worth fighting for.",
       "difficulty": "Easy",
       "tags": [
-        "Medical",
-        "Support",
-        "Civilian"
+        "Technical"
       ],
       "bonuses": {
         "Medic": 20,
@@ -289,8 +274,6 @@
       "description": "Some people spend years training to become formidable warriors. Others dedicate their lives to mastering a trade, only to remain painfully mediocre.\n\nThis one has apparently decided to ignore the entire process.\n\nPossessing an absurd amount of strength, skill, and talent, they are capable of feats that would take an ordinary person a lifetime to accomplish.\n\nThere is no tragic backstory, no ancient prophecy, and certainly no reasonable explanation for any of this.\n\nThis origin is intended for testing, experimentation, and those who have decided that struggling to survive is someone else's problem.\n\nWARNING - CHEAT / TESTING ORIGIN\nNOT INTENDED FOR NORMAL GAMEPLAY. THIS ORIGIN GRANTS EXTREMELY HIGH SKILLS AND WILL SIGNIFICANTLY ALTER THE INTENDED GAME EXPERIENCE.",
       "difficulty": "Cheaty",
       "tags": [
-        "Cheaty",
-        "Testing",
         "Special"
       ],
       "bonuses": {
@@ -331,6 +314,156 @@
       },
       "items": [],
       "testingOnly": true
+    },
+    {
+      "id": "kenshiorigins.scientist",
+      "startingCharactersOnly": false,
+      "name": "Scientist",
+      "description": "For years, this distinguished scientist enjoyed the patronage of a wealthy noble, financing their eccentric experiments and comfortable lifestyle.\n\nUnfortunately, their benefactor met an untimely end following a political dispute. The new administration proved considerably less appreciative of their talents, particularly after an expensive laboratory accident.\n\nStripped of their funding and privileges, they've taken to the wasteland.\n\nSurely, somewhere out there, someone will appreciate their genius.",
+      "difficulty": "Standard",
+      "tags": [
+        "Technical"
+      ],
+      "bonuses": {
+        "Science": 30,
+        "Robotics": 15,
+        "Engineering": 10
+      },
+      "items": [
+        {
+          "record": "43953-rebirth.mod",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.engineer",
+      "startingCharactersOnly": false,
+      "name": "Engineer",
+      "description": "For years, this engineer oversaw the maintenance of generators, batteries, and other machinery that kept a settlement running.\n\nIt was steady work until their employer decided that maintaining the equipment was becoming unnecessarily expensive. Apparently, so was maintaining an engineer.\n\nWith their position eliminated and their services no longer required, they've taken to the roads in search of employment.\n\nOne can only wonder how long those generators will keep running.",
+      "difficulty": "Standard",
+      "tags": [
+        "Technical"
+      ],
+      "bonuses": {
+        "Engineering": 20,
+        "Labouring": 8,
+        "Science": 5,
+        "Strength": 5
+      },
+      "items": [
+        {
+          "record": "42164-gamedata.base",
+          "quantity": 2,
+          "quality": 0
+        },
+        {
+          "record": "580-gamedata.base",
+          "quantity": 2,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.forgottenveteran",
+      "startingCharactersOnly": false,
+      "name": "The Forgotten Veteran",
+      "description": "Years of military service earned this veteran a respectable collection of scars and little else.\n\nDuring their last battle, they were wounded and abandoned alongside the dead. Unfortunately for whoever was responsible for counting casualties, they survived.\n\nAfter months of recovery, they found themselves without a regiment, a pension, or a superior officer to answer to.\n\nFor the first time in years, their life was their own.\n\nA rather generous retirement package, all things considered.",
+      "difficulty": "Easy",
+      "tags": [
+        "Combat",
+        "Survival"
+      ],
+      "bonuses": {
+        "Toughness": 25,
+        "MeleeDefence": 15,
+        "MeleeAttack": 15,
+        "Strength": 10,
+        "Dexterity": 5,
+        "Medic": 5
+      },
+      "items": [
+        {
+          "record": "901-gamedata.base",
+          "quantity": 1,
+          "quality": 0
+        },
+        {
+          "record": "515-gamedata.base",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.seasonedwanderer",
+      "startingCharactersOnly": false,
+      "name": "Seasoned Wanderer",
+      "description": "Decades spent travelling the continent have taught this wanderer a little bit of everything, from treating wounds to picking locks and finding shelter in forgotten ruins.\n\nThey've endured sandstorms, hungry wildlife, and the hospitality of some particularly unpleasant settlements.\n\nThey've never mastered a trade, but knowing a little about everything has kept them alive considerably longer than most.\n\nTheir belongings fit neatly into a backpack. As for their destination, they'll decide when they get there.",
+      "difficulty": "Easy",
+      "tags": [
+        "Survival"
+      ],
+      "bonuses": {
+        "Athletics": 15,
+        "Toughness": 12,
+        "Swimming": 8,
+        "Medic": 8,
+        "Stealth": 8,
+        "Lockpicking": 5,
+        "Cooking": 5
+      },
+      "items": [
+        {
+          "record": "46042-rebirth.mod",
+          "quantity": 1,
+          "quality": 0
+        },
+        {
+          "record": "42334-changes_otto.mod",
+          "quantity": 3,
+          "quality": 0
+        },
+        {
+          "record": "209-gamedata.base",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.adventurousinnkeeper",
+      "startingCharactersOnly": false,
+      "name": "Adventurous Innkeeper",
+      "description": "For years, this innkeeper served meals and listened to travellers recount their adventures across the continent.\n\nSomewhere between preparing dinner and hearing yet another exaggerated tale of ancient ruins and forgotten treasures, they began wondering what stories they might have to tell.\n\nEventually, curiosity got the better of them. They sold their establishment, packed some provisions, and set off to see the world for themselves.\n\nWhatever awaits them out there, at least they won't have to suffer through another traveller's terrible cooking.",
+      "difficulty": "Standard",
+      "tags": [
+        "Civilian"
+      ],
+      "bonuses": {
+        "Cooking": 25,
+        "Strength": 5,
+        "Farming": 5,
+        "MeleeDefence": 3
+      },
+      "items": [
+        {
+          "record": "43959-rebirth.mod",
+          "quantity": 2,
+          "quality": 0
+        },
+        {
+          "record": "1946-gamedata.base",
+          "quantity": 2,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
     }
   ]
 }

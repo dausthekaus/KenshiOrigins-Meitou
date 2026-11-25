@@ -1,0 +1,336 @@
+{
+  "formatVersion": 1,
+  "origins": [
+    {
+      "id": "kenshiorigins.nobody",
+      "startingCharactersOnly": true,
+      "name": "Nobody",
+      "description": "No remarkable talents, no great achievements, and no reputation worth mentioning.\n\nJust another nobody trying to make a living in a world that couldn't care less.",
+      "difficulty": "Hard",
+      "tags": [
+        "Vanilla",
+        "Starter"
+      ],
+      "bonuses": {},
+      "items": [],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.wanderer",
+      "startingCharactersOnly": false,
+      "name": "Wanderer",
+      "description": "No home, no fortune, and no past worth speaking of. Just another wanderer who has spent years travelling across the continent, going wherever the roads would take them.\n\nThey've lived off whatever work they could find, slept beneath the open sky, and learned that sometimes a good pair of legs is worth more than a rusty sword.\n\nTheir travels have brought them to yet another unfamiliar place, carrying little more than worn shoes, a few supplies, and the experience of having survived this long.\n\nFor now, it's as good a place as any to start over.",
+      "difficulty": "Standard",
+      "tags": [
+        "Travel",
+        "Survival"
+      ],
+      "bonuses": {
+        "Athletics": 5,
+        "Swimming": 3
+      },
+      "items": [
+        {
+          "record": "42334-changes_otto.mod",
+          "quantity": 2,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.farmhand",
+      "startingCharactersOnly": false,
+      "name": "Farmhand",
+      "description": "Life on the farm was never easy, but there was food on the table and a roof overhead. For a farmer in the wasteland, that was already more than most could ask for.\n\nThen came the raiders.\n\nThe fields were trampled, the buildings set ablaze, and whatever couldn't be carried away was left to burn. Amid the chaos, one farmhand managed to escape with little more than their life.\n\nWith nothing left to harvest and nowhere to return to, they've taken to the roads in search of greener pastures.",
+      "difficulty": "Standard",
+      "tags": [
+        "Civilian",
+        "Farming"
+      ],
+      "bonuses": {
+        "Farming": 12,
+        "Labouring": 5,
+        "Strength": 3
+      },
+      "items": [
+        {
+          "record": "2064-gamedata.base",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.apprentice",
+      "startingCharactersOnly": false,
+      "name": "Smith Apprentice",
+      "description": "The forge was never a comfortable place to work. Between the scorching heat, choking smoke, and the constant ringing of hammers, even a quiet day could leave an apprentice exhausted.\n\nYears spent feeding furnaces, shaping metal, and tending to the occasional burn taught them the trade, along with a healthy tolerance for pain.\n\nThe work was honest, and the pay was enough to get by. But after years of staring at the same four walls, the thought of spending another lifetime beside the furnace became increasingly difficult to stomach.\n\nSo they saved what little they could, packed their belongings, and left the workshop behind.\n\nThere was a whole continent beyond the forge, after all.",
+      "difficulty": "Standard",
+      "tags": [
+        "Crafting",
+        "Smithing"
+      ],
+      "bonuses": {
+        "SmithingWeapon": 10,
+        "SmithingArmour": 5,
+        "Toughness": 3
+      },
+      "items": [
+        {
+          "record": "43404-changes_otto.mod",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.streeturchin",
+      "startingCharactersOnly": false,
+      "name": "Street Urchin",
+      "description": "Life on the streets taught this urchin a few valuable lessons: how to find food, avoid trouble, and disappear into a crowd when the guards came looking.\n\nYears of picking pockets and sleeping in forgotten corners taught them how to blend in with the common folk.\n\nThese days, they're just another unremarkable face in a tavern or among the crowds. Whether they've left their old habits behind is anyone's guess.",
+      "difficulty": "Standard",
+      "tags": [
+        "Stealth",
+        "Thievery",
+        "Civilian"
+      ],
+      "bonuses": {
+        "Stealth": 12,
+        "Thieving": 8,
+        "Athletics": 5
+      },
+      "items": [
+        {
+          "record": "42334-changes_otto.mod",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.soldier",
+      "startingCharactersOnly": false,
+      "name": "Soldier",
+      "description": "The promise of steady pay, regular meals, and a roof overhead was enough to convince this soldier to enlist.\n\nReality was far less generous. Endless marches, miserable rations, and the horrors of war quickly taught them that military life was no place for the faint of heart.\n\nAfter surviving one battle too many, they decided that no amount of coin was worth dying in some forgotten corner of the wasteland.\n\nOne night, they simply walked away.",
+      "difficulty": "Easy",
+      "tags": [
+        "Combat",
+        "Melee",
+        "Military"
+      ],
+      "bonuses": {
+        "MeleeAttack": 10,
+        "MeleeDefence": 12,
+        "Toughness": 5
+      },
+      "items": [
+        {
+          "record": "475-gamedata.base",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.gunner",
+      "startingCharactersOnly": false,
+      "name": "Gunner",
+      "description": "Years of mercenary work have taken this gunner across the wasteland, guarding caravans and settlements with whatever crossbow or turret was available.\n\nThe pay was decent, but contracts rarely lasted, and even a skilled marksman could find themselves hungry between jobs.\n\nTired of chasing work from one settlement to another, they've decided to seek something more permanent.\n\nPreferably somewhere with walls.",
+      "difficulty": "Easy",
+      "tags": [
+        "Combat",
+        "Ranged",
+        "Mercenary"
+      ],
+      "bonuses": {
+        "Crossbows": 12,
+        "Turrets": 10,
+        "Perception": 5
+      },
+      "items": [
+        {
+          "record": "66534-Newwworld.mod",
+          "quantity": 1,
+          "quality": 10
+        },
+        {
+          "record": "96014-rebirth.mod",
+          "quantity": 2,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.assassin",
+      "startingCharactersOnly": false,
+      "name": "Assassin",
+      "description": "For years, this assassin worked for a little-known organization, carrying out contracts that required discretion and a steady hand.\n\nTheir last assignment, however, went terribly wrong. The operation fell apart, and their former associates disappeared in the aftermath.\n\nWith no employer to return to and few questions worth answering, they've taken to looking for work elsewhere.\n\nAfter all, there are always people willing to pay for a quiet death.",
+      "difficulty": "Easy",
+      "tags": [
+        "Combat",
+        "Stealth",
+        "Criminal"
+      ],
+      "bonuses": {
+        "Assassination": 20,
+        "Stealth": 15,
+        "Dexterity": 5
+      },
+      "items": [
+        {
+          "record": "1020-gamedata.base",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.escapedslave",
+      "startingCharactersOnly": false,
+      "name": "Escaped Slave",
+      "description": "Years of forced labour, meagre rations, and the watchful eyes of guards had made freedom seem like a distant dream.\n\nThen, one day, chaos broke out. Whether they slipped away during the fighting or hid among the cargo, one slave managed to disappear without a trace.\n\nTheir years in captivity left them with little more than calloused hands, a few bruises, and some experience defending themselves without a weapon.\n\nNow free of their chains, they face a world that has never been particularly kind to the unfortunate.",
+      "difficulty": "Hard",
+      "tags": [
+        "Survival",
+        "Labouring",
+        "Slavery"
+      ],
+      "bonuses": {
+        "Labouring": 12,
+        "MartialArts": 5,
+        "Toughness": 3
+      },
+      "items": [],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.fugitive",
+      "startingCharactersOnly": false,
+      "name": "Fugitive",
+      "description": "Years of drinking, petty crime, and tavern brawls have earned this troublemaker a few scars and an impressive collection of unpaid debts.\n\nTheir fists proved useful whenever an argument got out of hand, though their judgment rarely did.\n\nEventually, one brawl went too far, attracting more attention from the local authorities than they could comfortably handle.\n\nRather than face the consequences, they skipped town at the first opportunity.\n\nSome lessons are harder to learn than others.",
+      "difficulty": "Standard",
+      "tags": [
+        "Criminal",
+        "Combat",
+        "Survival"
+      ],
+      "bonuses": {
+        "MartialArts": 10,
+        "Toughness": 8,
+        "Athletics": 5
+      },
+      "items": [],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.miner",
+      "startingCharactersOnly": false,
+      "name": "Miner",
+      "description": "Years spent digging through rock and hauling ore have left this miner with aching muscles, calloused hands, and a considerable amount of debt.\n\nThe wages were never generous, and whatever little they earned seemed to disappear into the pockets of creditors.\n\nEventually, they decided that spending another lifetime underground wasn't going to solve their problems.\n\nSo they packed their belongings and left the mines behind.\n\nThe debt, unfortunately, didn't leave with them.",
+      "difficulty": "Standard",
+      "tags": [
+        "Civilian",
+        "Labouring"
+      ],
+      "bonuses": {
+        "Labouring": 15,
+        "Strength": 5,
+        "Toughness": 3
+      },
+      "items": [
+        {
+          "record": "52295-rebirth.mod",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.fieldmedic",
+      "startingCharactersOnly": false,
+      "name": "Field Medic",
+      "description": "Years spent tending to the wounded have taught this medic that war leaves far more broken bodies than heroes.\n\nSoldiers, mercenaries, civilians; the wounded kept coming, and there were never enough supplies or hands to save them all.\n\nEventually, they grew tired of patching up soldiers only to see them sent back to the slaughter.\n\nThey left the battlefield behind, taking what medical supplies they could carry.\n\nThere would always be more blood to spill in the wasteland. Perhaps this time, it could be for a cause worth fighting for.",
+      "difficulty": "Easy",
+      "tags": [
+        "Medical",
+        "Support",
+        "Civilian"
+      ],
+      "bonuses": {
+        "Medic": 20,
+        "Athletics": 5
+      },
+      "items": [
+        {
+          "record": "515-gamedata.base",
+          "quantity": 1,
+          "quality": 0
+        },
+        {
+          "record": "1435-gamedata.base",
+          "quantity": 1,
+          "quality": 0
+        }
+      ],
+      "testingOnly": false
+    },
+    {
+      "id": "kenshiorigins.unfairone",
+      "startingCharactersOnly": true,
+      "name": "The Unfair One",
+      "description": "Some people spend years training to become formidable warriors. Others dedicate their lives to mastering a trade, only to remain painfully mediocre.\n\nThis one has apparently decided to ignore the entire process.\n\nPossessing an absurd amount of strength, skill, and talent, they are capable of feats that would take an ordinary person a lifetime to accomplish.\n\nThere is no tragic backstory, no ancient prophecy, and certainly no reasonable explanation for any of this.\n\nThis origin is intended for testing, experimentation, and those who have decided that struggling to survive is someone else's problem.\n\nWARNING - CHEAT / TESTING ORIGIN\nNOT INTENDED FOR NORMAL GAMEPLAY. THIS ORIGIN GRANTS EXTREMELY HIGH SKILLS AND WILL SIGNIFICANTLY ALTER THE INTENDED GAME EXPERIENCE.",
+      "difficulty": "Cheaty",
+      "tags": [
+        "Cheaty",
+        "Testing",
+        "Special"
+      ],
+      "bonuses": {
+        "Strength": 75,
+        "MeleeAttack": 75,
+        "Labouring": 50,
+        "Science": 50,
+        "Engineering": 50,
+        "Robotics": 50,
+        "SmithingWeapon": 50,
+        "SmithingArmour": 50,
+        "Medic": 50,
+        "Thieving": 50,
+        "Turrets": 75,
+        "Farming": 50,
+        "Cooking": 50,
+        "Stealth": 50,
+        "Athletics": 75,
+        "Dexterity": 75,
+        "MeleeDefence": 75,
+        "Toughness": 75,
+        "Assassination": 75,
+        "Swimming": 75,
+        "Perception": 75,
+        "Katanas": 75,
+        "Sabres": 75,
+        "Hackers": 75,
+        "HeavyWeapons": 75,
+        "Blunt": 75,
+        "MartialArts": 75,
+        "MassCombat": 75,
+        "Dodge": 75,
+        "Polearms": 75,
+        "Crossbows": 75,
+        "FriendlyFire": 75,
+        "Lockpicking": 50,
+        "SmithingBow": 50
+      },
+      "items": [],
+      "testingOnly": true
+    }
+  ]
+}

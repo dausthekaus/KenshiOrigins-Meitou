@@ -10,7 +10,7 @@ import tempfile
 
 repo = Path(__file__).resolve().parent.parent
 if len(sys.argv) < 2:
-    sys.exit("Usage: python3 scripts/check.py <Meitou release folder> [--ui-root <Kenshi folder>] [--ui-theme <mod folder>] [--render-ui] [--generate] [--export-vanilla-items] [--validate-origins <JSON file>]")
+    sys.exit("Usage: python3 scripts/check.py <Meitou release folder> [--ui-root <Kenshi folder>] [--ui-theme <mod folder>] [--render-ui] [--core-ui] [--extra-pack-ui] [--generate] [--export-vanilla-items] [--validate-origins <JSON file>]")
 runtime = Path(sys.argv[1]).resolve(strict=True)
 subprocess.run([
     "dotnet", "build", str(repo / "checks/KOChecks.csproj"), "-c", "Release",

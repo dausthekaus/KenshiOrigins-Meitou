@@ -1,8 +1,8 @@
 {
   "id": "kenshiorigins",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "apiVersion": 3,
-  "gameVersion": ">=0.22.2 <0.22.3",
+  "gameVersion": ">=0.23.2 <0.23.3",
   "assemblies": ["KenshiOrigins.dll"],
   "entry": "KenshiOrigins.OriginsMod"
 }

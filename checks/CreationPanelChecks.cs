@@ -13,7 +13,8 @@ using Meitou.Simulation.Editing;
 internal static class CreationPanelChecks
 {
     internal static void Run(OriginCatalog catalog, GameDatabase database, WorldSession session, object player, object editor,
-        CharacterDraft draft, CharacterId character, string? install, Action<bool, string> check, string? theme = null, string? preview = null)
+        CharacterDraft draft, CharacterId character, string? install, Action<bool, string> check, string? theme = null, string? preview = null,
+        bool corePack = false)
     {
         if (install is null)
         {
@@ -102,16 +103,27 @@ internal static class CreationPanelChecks
                 && c.Action != $"mygui:combo:{menu}:toggle"))
                 Click(controls.First(c => c.Action == $"mygui:combo:{menu}:toggle"));
             controls = Frame();
-            UiControl Option() => controls.First(c => c.Caption == caption && c.Action.StartsWith($"mygui:combo:{menu}:", StringComparison.Ordinal)
-                && c.Action != $"mygui:combo:{menu}:toggle");
-            for (int scroll = 0; scroll < 20 && Option().Bounds.Intersect(Option().Clip ?? Option().Bounds).Height < Option().Bounds.Height / 2; scroll++)
+            bool IsOption(UiControl control) => control.Action.StartsWith($"mygui:combo:{menu}:", StringComparison.Ordinal)
+                && control.Action != $"mygui:combo:{menu}:toggle";
+            for (int scroll = 0; scroll < 40; scroll++)
             {
-                var clip = Option().Clip!.Value;
-                screens.Wheel(new Vector2(clip.X + clip.Width / 2, clip.Y + clip.Height / 2), -1);
+                var option = controls.FirstOrDefault(c => IsOption(c) && c.Caption == caption);
+                if (option is not null && option.Bounds.Intersect(option.Clip ?? option.Bounds).Height >= option.Bounds.Height / 2)
+                {
+                    Click(option);
+                    return Frame();
+                }
+                // Larger catalogs virtualize off-screen rows; scroll a visible popup row until the target is arranged.
+                var anchor = option ?? controls.First(c => IsOption(c)
+                    && c.Bounds.Intersect(c.Clip ?? c.Bounds).Height > 0);
+                var clip = anchor.Clip ?? anchor.Bounds;
+                int targetIndex = bindings!.Lists[menu].ToList().FindIndex(item => item.Caption == caption);
+                int anchorIndex = bindings.Lists[menu].ToList().FindIndex(item => item.Caption == anchor.Caption);
+                float direction = targetIndex < anchorIndex || option is not null && option.Bounds.Y < clip.Y ? 1 : -1;
+                screens.Wheel(new Vector2(clip.X + clip.Width / 2, clip.Y + clip.Height / 2), direction);
                 controls = Frame();
             }
-            Click(Option());
-            return Frame();
+            throw new InvalidOperationException($"Could not scroll the native selector to '{caption}'.");
         }
         void SelectTag(string tag)
         {
@@ -137,6 +149,81 @@ internal static class CreationPanelChecks
             foreach (char letter in query) typed &= screens.TextInput(letter);
             check(typed && screens.GetText("editor", OriginCreationPanel.Search) == query, "native search field accepts the query");
             Frame();
+        }
+
+        if (corePack)
+        {
+            var coreFrame = Frame(1920, 1080);
+            check(bindings!.Lists[OriginCreationPanel.Combo].Count == catalog.All.Count + 1,
+                "the expanded native selector contains all loaded origins plus Random");
+            if (catalog.All.Count == 18)
+            {
+                foreach (var (width, height) in new[] { (1920, 1080), (1280, 720) })
+                {
+                    coreFrame = Frame(width, height);
+                    var buttons = coreFrame.Where(c => c.Name.StartsWith(OriginCreationPanel.TagButtonPrefix, StringComparison.Ordinal)).ToArray();
+                    check(buttons.Length == 6 && buttons.All(c => c.Bounds.Intersect(c.Clip ?? c.Bounds).Width >= c.Bounds.Width - 1),
+                        $"all five official categories and All tags fit without horizontal clipping at {width}x{height}");
+                }
+            }
+            int unchanged = draft.Version;
+            foreach (string tag in new[] { "Civilian", "Combat", "Special", "Survival", "Technical" })
+            {
+                SelectTag(tag);
+                check(bindings!.Lists[OriginCreationPanel.Combo].Where(item => item.Id != OriginCreationPanel.RandomOption)
+                    .Select(item => item.Id).SequenceEqual(catalog.All.Where(o => o.Tags.Contains(tag))
+                        .OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase).Select(o => o.Id)),
+                    $"native {tag} button filters the consolidated official tags in alphabetical order");
+                if (tag is "Combat" or "Survival")
+                    check(bindings.Lists[OriginCreationPanel.Combo].Any(item => item.Id == "kenshiorigins.forgottenveteran"),
+                        "The Forgotten Veteran appears under either category without requiring both");
+            }
+            check(draft.Version == unchanged, "category browsing preserves the saved draft choice");
+            SelectTag("Combat");
+            Query("RECOVERY");
+            check(bindings!.Lists[OriginCreationPanel.Combo].Select(item => item.Id)
+                .SequenceEqual(["kenshiorigins.forgottenveteran", OriginCreationPanel.RandomOption]),
+                "native search combines with a category and finds the new veteran story case-insensitively");
+            Query("");
+            SelectTag("All tags");
+            Query("scientist");
+            Select(OriginCreationPanel.Combo, "Scientist");
+            check(draft.Record.Ints[originKey] == catalog.IndexOf("kenshiorigins.scientist")
+                && bindings!.Text["DescriptionPanelText"].Contains(catalog.Find("kenshiorigins.scientist")!.Description),
+                "selecting a new origin saves its original catalog index and shows its complete story");
+            Query("");
+            if (catalog.Find("extraorigins.dockworker") is not null)
+            {
+                SelectTag("Labouring");
+                check(bindings!.Lists[OriginCreationPanel.Combo].Select(item => item.Id)
+                    .SequenceEqual(["extraorigins.dockworker", OriginCreationPanel.RandomOption]),
+                    "an explicitly contributed old tag remains usable through the native third-party category button");
+                Select(OriginCreationPanel.Combo, "Dockworker");
+                check(draft.Record.Ints[originKey] == catalog.IndexOf("extraorigins.dockworker"),
+                    "third-party tag selection still saves the correct external origin index");
+                SelectTag("All tags");
+            }
+            coreFrame = Select(OriginCreationPanel.Combo, "The Unfair One");
+            check(coreFrame.Any(c => c.Caption == "The Unfair One" && c.Properties.GetValueOrDefault("TextColour") == OriginUi.TestingInk)
+                && coreFrame.Where(c => c.Caption.Contains("TESTING ONLY")).All(c => c.Properties.GetValueOrDefault("TextColour") == OriginUi.TestingInk),
+                "the real cheat origin retains its red selector, story and manual-only warning in the expanded pack");
+            if (preview is not null)
+            {
+                UiPreview.Save(resources, Resolve, painter =>
+                {
+                    actualTextHeight = c => painter.TextHeight(c, 1080, 13);
+                    var rendered = Frame(1920, 1080);
+                    foreach (var button in rendered.Where(c => c.Name.StartsWith(OriginCreationPanel.TagButtonPrefix, StringComparison.Ordinal)))
+                    {
+                        var wrapping = button with { Properties = new Dictionary<string, string>(button.Properties) { ["WordWrap"] = "true" } };
+                        check(painter.TextHeight(wrapping, 1080, 0) <= painter.TextHeight(wrapping with { Caption = "M" }, 1080, 0),
+                            $"the full '{button.Caption}' label fits its native text area without truncation");
+                    }
+                    return rendered;
+                }, preview, 1920, 1080);
+                actualTextHeight = null;
+            }
+            return;
         }
 
         var frame = Frame();

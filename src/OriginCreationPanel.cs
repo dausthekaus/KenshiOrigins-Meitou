@@ -178,7 +178,7 @@ internal static class OriginCreationPanel
             Position(ResultCount, new(.035f, Unit(132), .93f, Unit(18)));
             Position("DescriptionPanelText", new(.025f, Unit(156), .95f, Math.Max(0, 1 - Unit(164))));
             var categories = Categories();
-            float totalWidth = categories.Sum(tag => TagWidth(tag) + 6);
+            float totalWidth = categories.Sum(TagWidth) + 6 * (categories.Length - 1);
             // Only the horizontal axis scrolls. Let the skin supply the client height so rounding
             // cannot create a tiny hidden vertical range that steals the mouse wheel.
             b.Canvas[TagRow] = (totalWidth * scale, 0);
@@ -250,7 +250,7 @@ internal static class OriginCreationPanel
                     new MyGuiWidget("ScrollView", TagRow, "Kenshi_ScrollViewEmpty", "", "Left Top", new(.025f, .25f, .95f, .14f), true,
                         new Dictionary<string, string> { ["VisibleVScroll"] = "false", ["VisibleHScroll"] = "true", ["CanvasAlign"] = "Left Top" },
                         new Dictionary<string, string>(), Categories().Select((tag, index) =>
-                            new MyGuiWidget("Button", TagButtonPrefix + index, "Kenshi_Button1", "", "Left Top", new(0, 0, 1, 1), true,
+                            new MyGuiWidget("Button", TagButtonPrefix + index, "Kenshi_Button2", "", "Left Top", new(0, 0, 1, 1), true,
                                 new Dictionary<string, string> { ["TextAlign"] = "Center VCenter" }, new Dictionary<string, string>(), [])).ToArray()),
                     Label(ResultCount, new(.035f, .40f, .93f, .055f))] };
             var children = widget.Children.Select(Visit).ToArray();
@@ -272,7 +272,7 @@ internal static class OriginCreationPanel
         new Dictionary<string, string>(), []);
 
     private static string[] Categories() => ["All tags", .. OriginBrowser.Tags(s_catalog)];
-    private static float TagWidth(string tag) => Math.Max(72, tag.Length * 9 + 24);
+    private static float TagWidth(string tag) => Math.Max(56, tag.Length * 7 + 16);
 
     /// <summary>Selection writes straight to the current draft; no secondary Apply/Save action exists.</summary>
     private static bool Action(object __instance, MyGuiEvent e)
