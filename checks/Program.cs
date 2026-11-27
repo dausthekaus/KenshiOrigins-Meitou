@@ -20,6 +20,7 @@ using Meitou.Simulation.Factions;
 using Meitou.Simulation.Items;
 using Meitou.Simulation.Player;
 using Meitou.Simulation.Population;
+using Meitou.Simulation.Saving;
 
 internal static class PrototypeChecks
 {
@@ -28,6 +29,19 @@ internal static class PrototypeChecks
         string repo = Path.GetFullPath(args[0]);
         int uiArgument = Array.IndexOf(args, "--ui-root");
         string? uiRoot = uiArgument >= 0 ? args[uiArgument + 1] : GameInstall.Locate()?.Root;
+        if (args.Contains("--audit-origins"))
+        {
+            int passed = 0;
+            OriginPersistenceChecks.Run(repo, uiRoot ?? throw new ArgumentException("Pass --ui-root with the Kenshi installation folder."),
+                (condition, message) =>
+                {
+                    if (!condition) throw new InvalidDataException(message);
+                    passed++;
+                    Console.WriteLine("  OK " + message);
+                });
+            Console.WriteLine($"PASS: {passed} persistence and cap-investigation assertions.");
+            return;
+        }
         if (args.Contains("--export-vanilla-items"))
         {
             VanillaItemReference.Write(repo, uiRoot ?? throw new ArgumentException("Pass --ui-root with the Kenshi installation folder."));
@@ -83,12 +97,15 @@ internal static class PrototypeChecks
             CheckValidation();
             CoreExpansionChecks.Run(repo, bundled, Check);
             CheckLifecycle();
+            CheckCharacterFields();
+            OriginProgressionChecks.Run(Check);
             CheckStartOnlyOrigins();
             CheckTestingOrigins();
             CheckCombatOrigins();
             EquipmentChecks.Run(bundled, uiRoot, Check);
             if (uiRoot is not null) OriginContentChecks.Run(bundled, uiRoot, Check,
                 new OriginCatalog(OriginCatalog.ReadFile(Path.Combine(fixtures, "core-v0.3.3.json"))));
+            if (uiRoot is not null) OriginPersistenceChecks.Run(repo, uiRoot, Check);
             CheckUi();
             Check(DeterministicHash(1) == DeterministicHash(4), "assignments and hashes agree with one and four worker threads");
             Console.WriteLine($"PASS: {assertions} assertions against {typeof(IMod).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion}.");
@@ -278,6 +295,53 @@ internal static class PrototypeChecks
             using var luckySave = JsonDocument.Parse(Save(lucky));
             Check(catalog.Find(luckySave.RootElement.GetProperty("Assignments")[0].GetProperty("OriginId").GetString()!) is not null,
                 "Random persists the resolved stable origin ID rather than a random placeholder");
+        }
+
+        void CheckCharacterFields()
+        {
+            var source = MakeSystem();
+            using var old = MakeWorld(source);
+            var original = Spawn(old, "Sidecar authority", true);
+            old.Player.InCreation = true;
+            source.Ready(old, false);
+            Cold(old, original).Appearance!.Loadout!.Appearance.Record.Ints[ModLooks.KeyOf(OriginsMod.Id, OriginSystem.ChoiceKey)] = catalog.IndexOf("kenshiorigins.farmhand");
+            old.Player.InCreation = false;
+            source.Reconcile(old);
+            var restored = MakeSystem();
+            restored.Read(new MemoryStream(Save(source)));
+            using var loaded = MakeWorld(restored);
+            var same = Spawn(loaded, "Changed name", true);
+            typeof(CharacterCold).GetProperty("LastingId")!.SetValue(Cold(loaded, same), Cold(old, original).LastingId);
+            loaded.SaveFields.SetString(same, CharacterSaveRecord.Stats, OriginSystem.SavedOriginKey, "kenshiorigins.wanderer");
+            loaded.SaveFields.SetString(same, CharacterSaveRecord.Stats, OriginSystem.SavedItemsKey, "[]");
+            restored.Ready(loaded, true);
+            Check(restored.Views[same].Name == "Farmhand"
+                && loaded.SaveFields.String(same, CharacterSaveRecord.Stats, OriginSystem.SavedOriginKey) == "kenshiorigins.farmhand",
+                "normal-load sidecar assignments take priority over stale character backup fields");
+
+            var fieldsOnly = MakeSystem();
+            using var imported = MakeWorld(fieldsOnly);
+            var missing = Spawn(imported, "Unknown origin", true);
+            imported.SaveFields.SetString(missing, CharacterSaveRecord.Stats, OriginSystem.SavedOriginKey, "removed.origin");
+            fieldsOnly.Ready(imported, true);
+            Check(fieldsOnly.Views[missing].Name.Contains("Unavailable origin") && Cold(imported, missing).Stats!.Modifiers.All.Count == 0,
+                "an imported origin from a missing pack keeps its stable ID instead of rerolling");
+
+            foreach (string? pending in new string?[] { null, "{", "null", "[{\"Record\":\"test.item\",\"Quantity\":1001,\"Quality\":0}]" })
+            {
+                var system = MakeSystem();
+                using var world = MakeWorld(system);
+                var id = Spawn(world, "Imported queue", true);
+                world.SaveFields.SetString(id, CharacterSaveRecord.Stats, OriginSystem.SavedOriginKey, "kenshiorigins.farmhand");
+                if (pending is not null) world.SaveFields.SetString(id, CharacterSaveRecord.Stats, OriginSystem.SavedItemsKey, pending);
+                int errorsBefore = logs.Count(line => line.StartsWith("Could not restore pending origin items"));
+                system.Ready(world, true);
+                system.Reconcile(world);
+                int errorsAfter = logs.Count(line => line.StartsWith("Could not restore pending origin items"));
+                Check(system.Views[id].Name == "Farmhand" && system.Views[id].ItemsWaiting == 0 && Cold(world, id).Inventory!.Items.Count == 0
+                    && errorsAfter - errorsBefore == (pending is null ? 0 : 1),
+                    "missing or invalid imported queue data cannot infer equipment or repeatedly log the same error");
+            }
         }
 
         void CheckStartOnlyOrigins()

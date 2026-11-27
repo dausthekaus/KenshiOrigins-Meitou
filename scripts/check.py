@@ -10,7 +10,7 @@ import tempfile
 
 repo = Path(__file__).resolve().parent.parent
 if len(sys.argv) < 2:
-    sys.exit("Usage: python3 scripts/check.py <Meitou release folder> [--ui-root <Kenshi folder>] [--ui-theme <mod folder>] [--render-ui] [--core-ui] [--extra-pack-ui] [--generate] [--export-vanilla-items] [--validate-origins <JSON file>]")
+    sys.exit("Usage: python3 scripts/check.py <Meitou release folder> [--ui-root <Kenshi folder>] [--ui-theme <mod folder>] [--render-ui] [--core-ui] [--extra-pack-ui] [--generate] [--export-vanilla-items] [--validate-origins <JSON file>] [--audit-origins]")
 runtime = Path(sys.argv[1]).resolve(strict=True)
 subprocess.run([
     "dotnet", "build", str(repo / "checks/KOChecks.csproj"), "-c", "Release",
@@ -44,7 +44,7 @@ with tempfile.TemporaryDirectory(prefix="kenshiorigins-runtime-") as temporary:
     (run / "KOChecks.deps.json").write_text(json.dumps(deps))
     environment = dict(os.environ, XDG_CONFIG_HOME=str(run / "config"))
     subprocess.run([str(run / "KOChecks"), str(repo), *sys.argv[2:]], env=environment, check=True)
-    if not {"--generate", "--export-vanilla-items", "--validate-origins"}.intersection(sys.argv):
+    if not {"--generate", "--export-vanilla-items", "--validate-origins", "--audit-origins"}.intersection(sys.argv):
         # A game-supplied (TPA) DLL is deliberately refused as a mod. Retest loading with
         # our assembly absent from that list, just as in an actual Meitou installation.
         del target[f"KenshiOrigins/{mod_version}"]

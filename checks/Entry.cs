@@ -23,7 +23,7 @@ file.Records.Add(new FcsRecord { StringId = "race", Name = "Human", RecordType =
 db.Apply(file, "loader.mod");
 var data = PopulationData.Create(db, []);
 var info = new ModInfo("KenshiOrigins", Path.Combine(repo, "bin/Release/net11.0/KenshiOrigins.mod"), ModSource.Local);
-var host = ModHost.Load(new ModHostOptions([info], db, data, () => null, GameVersion: new CodeModVersion(0, 23, 2)));
+var host = ModHost.Load(new ModHostOptions([info], db, data, () => null, GameVersion: new CodeModVersion(0, 24, 0)));
 Check(host.Mods.Count == 1 && host.Notices.Count == 0, "actual Meitou loader accepts the manifest, DLL and hook signatures");
 Check(host.Simulation!.Systems.Single().Name == "origins", "actual loader registers the per-world origin system");
 var rows = ModLooks.Rows(new LookRowContext(db.Find("race")!, false, new FcsRecord(), true));

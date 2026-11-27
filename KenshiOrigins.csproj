@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
     <AssemblyName>KenshiOrigins</AssemblyName>
-    <Version>0.4.0</Version>
+    <Version>0.4.1</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -23,6 +23,6 @@
   </ItemGroup>
   <Target Name="CheckMeitouDirectory" BeforeTargets="ResolveAssemblyReferences">
     <Error Condition="!Exists('$(MeitouDirectory)/MeitouClient.dll')"
-           Text="Set MeitouDirectory to the extracted 0.23.2 folder. See Meitou.local.props.example." />
+           Text="Set MeitouDirectory to the extracted 0.24.0 folder. See Meitou.local.props.example." />
   </Target>
 </Project>

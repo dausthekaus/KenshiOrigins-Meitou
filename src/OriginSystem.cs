@@ -1,20 +1,26 @@
 using System.Text.Json;
 using Meitou.Data.Characters;
 using Meitou.Data.Fcs;
+using Meitou.Data.Gameplay;
+using Meitou.Data.Gameplay.Bodies;
 using Meitou.Modding;
 using Meitou.Simulation;
 using Meitou.Simulation.Bodies;
 using Meitou.Simulation.Factions;
 using Meitou.Simulation.Items;
+using Meitou.Simulation.Saving;
 
 namespace KenshiOrigins;
 
 /// <summary>Owns per-world assignments. Only simulation callbacks may change characters or this state.</summary>
-internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpose, Action<string> log, ItemFactory? items = null)
-    : IWorldReady, IModSaveData, IStateHashed
+internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpose, Action<string> log, ItemFactory? items = null,
+    GameConstants? constants = null)
+    : IWorldReady, IModSaveData, IStateHashed, IExperienceFilter
 {
     internal const string ChoiceKey = "origin";
     internal const string ModifierKey = "kenshiorigins.origin";
+    internal const string SavedOriginKey = "kenshiorigins.origin";
+    internal const string SavedItemsKey = "kenshiorigins.pendingItems";
 
     private readonly Dictionary<LastingId, string> _assignments = [];
     private readonly Dictionary<CharacterId, int> _startingChoices = [];
@@ -54,6 +60,16 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
     public void Inputs(World world, IReadOnlyList<SimCommand> commands) => Reconcile(world);
     public void SlowWorld(World world) => Reconcile(world);
 
+    // XP filters can run on worker threads. This helper only reads the character's settled stats.
+    public float Gain(World world, in ExperienceGain gain)
+    {
+        // This cache and the immutable catalog are only changed at serial boundaries.
+        if (!_applied.TryGetValue(gain.Character, out var applied)
+            || catalog.Find(applied.OriginId)?.Bonuses.GetValueOrDefault(StatsInfo.StorageOf(gain.Skill)) is not > 0)
+            return gain.Amount;
+        return OriginProgression.Gain(world, gain, constants ?? GameConstants.Default);
+    }
+
     /// <summary>Also called after paused commands: this is a serial tick boundary, not a UI render callback.</summary>
     internal bool Reconcile(World world)
     {
@@ -69,6 +85,34 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
             present.Add(id);
 
             string? originId = cold.LastingId.IsNone ? null : _assignments.GetValueOrDefault(cold.LastingId);
+            bool restoredFields = false;
+            // Imports discard lasting IDs and mod sidecars, but keep the character's STATS record.
+            // Restore its saved origin before considering any random assignment or starter grant.
+            if (originId is null && world.SaveFields.String(id, CharacterSaveRecord.Stats, SavedOriginKey) is { } savedOrigin
+                && !string.IsNullOrWhiteSpace(savedOrigin))
+            {
+                var lasting = world.LastingIds.GetOrGive(id);
+                if (lasting.IsNone) continue;
+                originId = savedOrigin;
+                _assignments.Add(lasting, originId);
+                if (world.SaveFields.String(id, CharacterSaveRecord.Stats, SavedItemsKey) is { } savedItems)
+                {
+                    try
+                    {
+                        var grants = JsonSerializer.Deserialize<OriginItem[]>(savedItems, OriginCatalog.JsonOptions)
+                            ?? throw new InvalidDataException("Empty pending item data.");
+                        if (InvalidItems(grants)) throw new InvalidDataException("Invalid pending item data.");
+                        if (grants.Length > 0) _pendingItems.Add(lasting, grants);
+                    }
+                    catch (Exception error) when (error is JsonException or InvalidDataException)
+                    {
+                        log($"Could not restore pending origin items for {cold.Name}: {error.Message} No new equipment was inferred.");
+                    }
+                }
+                _startingChoices.Remove(id);
+                restoredFields = true;
+                changed = true;
+            }
             if (originId is null && cold.IsPlayer && cold.Medical?.Dead != true && cold.Stats is not null)
             {
                 if (world.Player.InCreation)
@@ -101,11 +145,13 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
             var definition = catalog.Find(originId);
             if (definition is null)
             {
+                KeepCharacterFields(world, id, cold.LastingId, originId, restoredFields);
                 if (_missingLogged.Add(originId)) log($"Saved origin '{originId}' is unavailable; keeping its ID without bonuses.");
                 views[id] = new OriginView($"Unavailable origin: {originId}", "Its origin pack is not loaded.", "No bonuses applied", false);
                 continue;
             }
-            changed |= Apply(id, cold.Stats, definition);
+            bool applied = Apply(id, cold.Stats, definition, out bool firstApplication);
+            changed |= applied;
             if (_equipment is not null && _pendingItems.TryGetValue(cold.LastingId, out var pendingItems))
             {
                 var remaining = _equipment.Deliver(cold, pendingItems);
@@ -122,6 +168,8 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
             {
                 ItemsWaiting = _pendingItems.TryGetValue(cold.LastingId, out var waiting) ? waiting.Sum(item => item.Quantity) : 0
             };
+            // Also backfill fields on older saves during normal play, before the next save/import.
+            KeepCharacterFields(world, id, cold.LastingId, originId, restoredFields || firstApplication);
         }
 
         foreach (var gone in _applied.Keys.Where(id => !present.Contains(id)).ToArray()) _applied.Remove(gone);
@@ -130,17 +178,42 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
         return changed;
     }
 
-    private bool Apply(CharacterId id, CharacterStats? stats, OriginDefinition origin)
+    private bool Apply(CharacterId id, CharacterStats? stats, OriginDefinition origin, out bool firstApplication)
     {
+        firstApplication = false;
         if (stats is null) return false;
-        if (_applied.TryGetValue(id, out var previous) && ReferenceEquals(previous.Stats, stats) && previous.OriginId == origin.Id)
-            return false;
-
-        stats.Modifiers.RemoveAll(ModifierKey);
-        foreach (var (stat, amount) in origin.Bonuses) stats.Modifiers.Set(ModifierKey, stat, amount);
-        _applied[id] = new AppliedBonus(stats, origin.Id);
-        return true;
+        firstApplication = !_applied.TryGetValue(id, out var previous)
+            || !ReferenceEquals(previous.Stats, stats) || previous.OriginId != origin.Id;
+        bool changed = firstApplication;
+        if (firstApplication)
+        {
+            stats.Modifiers.RemoveAll(ModifierKey);
+            _applied[id] = new AppliedBonus(stats, origin.Id);
+        }
+        // Recheck room as trained stats or other mods change, including while paused.
+        foreach (var (stat, configured) in origin.Bonuses)
+        {
+            float amount = OriginProgression.Bonus(stats, stat, configured);
+            var current = stats.Modifiers.All.FirstOrDefault(m => m.Key == ModifierKey && m.Stat == stat);
+            if (!firstApplication && current.Key == ModifierKey && current.Amount == amount) continue;
+            stats.Modifiers.Set(ModifierKey, stat, amount);
+            changed = true;
+        }
+        return changed;
     }
+
+    private void KeepCharacterFields(World world, CharacterId id, LastingId lasting, string originId, bool force)
+    {
+        if (force || world.SaveFields.String(id, CharacterSaveRecord.Stats, SavedOriginKey) != originId)
+            world.SaveFields.SetString(id, CharacterSaveRecord.Stats, SavedOriginKey, originId);
+        string pending = _pendingItems.TryGetValue(lasting, out var grants)
+            ? JsonSerializer.Serialize(grants, OriginCatalog.JsonOptions) : "[]";
+        if (force || world.SaveFields.String(id, CharacterSaveRecord.Stats, SavedItemsKey) != pending)
+            world.SaveFields.SetString(id, CharacterSaveRecord.Stats, SavedItemsKey, pending);
+    }
+
+    private static bool InvalidItems(OriginItem[] items) => items.Any(item => item is null || string.IsNullOrWhiteSpace(item.Record)
+        || item.Quantity is < 1 or > 1000 || item.Quality is < 0 or > 100);
 
     internal int ReadChoice(FcsRecord? look, int fallback = 0)
     {
@@ -188,8 +261,7 @@ internal sealed class OriginSystem(OriginCatalog catalog, RngPurpose randomPurpo
             // Version 2 queues already record outstanding deliveries and resume as saved.
             var grants = saved.FormatVersion == 1 ? []
                 : entry.PendingItems ?? throw new InvalidDataException("Missing pending origin items in save data.");
-            if (grants.Any(item => item is null || string.IsNullOrWhiteSpace(item.Record)
-                || item.Quantity is < 1 or > 1000 || item.Quality is < 0 or > 100))
+            if (InvalidItems(grants))
                 throw new InvalidDataException("Invalid pending origin item in save data.");
             if (grants.Length > 0) pending.Add(new LastingId(entry.Character), grants);
         }

@@ -1,6 +1,6 @@
 # Kenshi Origins prototype
 
-C# code mod for **MeitouClient 0.23.2**. It gives each player character an origin with additive stat bonuses and optional starting items. Version 0.4.0 targets this release; its manifest does not claim compatibility with older builds.
+C# code mod for **MeitouClient 0.24.0**. It gives each player character an origin with additive stat bonuses and optional starting items. Version 0.4.1 preserves origins through import and caps origin-boosted skills at 100, using the boosted level for XP difficulty. Its manifest does not claim compatibility with older builds.
 
 Start a new game and use the compact **Origin / Race** mode button at the upper left of the description panel. **Origin** opens by default with search beside the button, the origin selector underneath, a horizontal row of tag buttons, and a scrollable description below. Move the mouse wheel over the tags to scroll sideways, or use the horizontal scrollbar; **All tags** clears the category filter. Origin mode expands into the race-stat area for more reading space. **Race** restores the original race description and race stats.
 
@@ -43,6 +43,10 @@ Only characters in the initial Game Start roster receive starting items, after c
 
 Later recruits and characters added directly to player squads receive a random origin and its stat bonuses, but no starting equipment or equipment queue. This also applies to player characters added after the initial roster capture while the creation screen is still open. Moving between squads, dismissal and re-recruitment keep the assignment and do not create equipment grants.
 
+Positive bonuses have room only up to **100**, including The Unfair One. For example, trained Toughness 90 with a configured +25 receives +10. The JSON and description list the configured bonus; its actual contribution can be smaller near the cap. The contribution is checked again as trained stats or other additive modifiers change. Origins never reduces existing trained levels or another mod's modifier: if those already exceed 100, its contribution is zero. Equipment, injury and age multipliers retain their engine behavior; this is a cap on Origins' additive contribution rather than a global clamp on other systems.
+
+Origin-boosted skills train at their boosted level: trained 70 with +25 trains like vanilla 95. The supported `IExperienceFilter` adjusts incoming XP while preserving racial bonuses, XP settings and training-dummy limits. Combat and general skills retain the native curve toward 101, with a hard stop at boosted 100. Medical skills retain their separate seconds-per-point formula at the boosted level; mass combat retains straight gains. Reaching boosted 100 stops further training in that skill while its bonus is active. Skills without a positive origin bonus keep native training behavior. Bonuses stay separate from trained values and are never baked into a save.
+
 ## Build and install
 
 Requires a .NET 11 SDK and the extracted standard Meitou release. Copy `Meitou.local.props.example` to `Meitou.local.props` and set `MeitouDirectory` to the folder containing `MeitouClient.dll`. The local file is gitignored.
@@ -52,7 +56,9 @@ dotnet build KenshiOrigins.csproj -c Release
 python3 scripts/package.py
 ```
 
-Extract `artifacts/KenshiOrigins-0.4.0.zip` into your **Kenshi installation's `mods` directory**. Enable KenshiOrigins in the launcher and restart the client. Keep `KenshiOrigins.mod`, `meitou.json`, `KenshiOrigins.dll` and `originform.json` together in `mods/KenshiOrigins/`.
+Extract `artifacts/KenshiOrigins-0.4.1.zip` into your **Kenshi installation's `mods` directory**. Enable KenshiOrigins in the launcher and restart the client. Keep `KenshiOrigins.mod`, `meitou.json`, `KenshiOrigins.dll` and `originform.json` together in `mods/KenshiOrigins/`.
+
+For saves made before 0.4.1, **load the original save normally and save it again with this version before importing**. That save adds the per-character origin and outstanding-equipment fields which survive import. Importing an older, unmigrated save directly still lacks those fields; already-rerolled imports cannot reconstruct the old choices without a pre-import save.
 
 The package script also creates `artifacts/ExtraOrigins-example.zip`. Extract it into the same `mods` directory and enable it after KenshiOrigins to try the sample Dockworker origin. Its JSON includes all supported fields as a template for your own pack. Neither ZIP includes game DLLs.
 
@@ -113,13 +119,16 @@ Keep IDs stable and use your pack's prefix. Stat keys are names from Meitou's `S
 
 Equipment is queued once when an initial-roster character's origin is finalized. `OriginSystem` reuses its existing `_startingChoices` roster to make that decision before removing the temporary entry; no extra roster state is introduced. Delivered quantities and outstanding quantities persist with the character's lasting ID. Existing version-2 equipment queues resume exactly as saved, including queues written by v0.2.0, whose saves do not distinguish starters from recruits. No new grants are inferred on load. Version-1 saves from v0.1.x keep their origins and bonuses but receive no retroactive equipment, because they do not identify the initial roster. Installing on an existing save likewise grants origins and bonuses only. Later edits to an origin's item list do not grant another set to an already assigned character. The JSON content format stays at version 1; the internal save format stays at version 2.
 
+Normal loads still restore the existing sidecar by lasting ID. The mod also writes `kenshiorigins.origin` and `kenshiorigins.pendingItems` as strings in each character's STATS record through `world.SaveFields`. Import drops sidecars and lasting IDs but retains these character records. The mod restores the origin and exact outstanding queue before considering random assignment, then gives the character its new lasting ID. It never matches names or recreates delivered equipment. Unknown origin IDs remain unavailable rather than being rerolled. Invalid queue metadata is logged without inventing replacement equipment.
+
 ## Read the code
 
 - `src/OriginsMod.cs`: the entry point. Registers the world system and narrow Harmony hooks.
 - `src/OriginCatalog.cs`: finds dependent packs and validates their JSON. Content loading stays separate from gameplay.
 - `src/OriginDefinition.cs`: describes an origin without putting character-specific state in it.
 - `src/OriginEquipment.cs`: makes item instances and puts them into storage, returning only quantities that still need space.
-- `src/OriginSystem.cs`: remembers the starting roster, waits for creation to finish, resolves Random, assigns origins and restores modifiers. The save stores stable origin IDs and pending equipment against the engine's lasting character IDs.
+- `src/OriginSystem.cs`: remembers the starting roster, waits for creation to finish, resolves Random, assigns origins and restores modifiers. The save stores stable origin IDs and pending equipment against lasting character IDs, with per-character fields as the import-safe backup.
+- `src/OriginProgression.cs`: calculates room for the origin's bonus and adjusts native XP using the boosted skill level. The XP callback only reads state, so it can run on simulation worker threads.
 - `src/OriginBrowser.cs`: searches and sorts the displayed origins and gathers their tags without mutating the underlying catalog.
 - `src/OriginCreationPanel.cs`: extends the existing description area with a mode switch, native search and selector, horizontal category buttons and scrolling details. Each origin selection updates the current draft through the engine's setter, so Confirm includes it; browsing filters do not edit drafts.
 - `src/OriginUi.cs`: displays assigned origins in stats. Hooks preserve the chosen origin across cached race/gender looks, appearance reset/import, and handle recruitment or confirmation while paused.
@@ -131,7 +140,7 @@ Bonuses use one named modifier source. Setting that source replaces its previous
 On Linux, run the headless checks with the release's own bundled runtime and Harmony:
 
 ```sh
-python3 scripts/check.py /path/to/Meitou/versions/0.23.2
+python3 scripts/check.py /path/to/Meitou/versions/0.24.0
 ```
 
 They exercise dependent-pack discovery, validation, multiple custom starting squads, start-only eligibility (including Random, empty recruit pools and saved assignments), deferred starter equipment, recruits and later player spawns receiving bonuses without gear, partial inventory delivery, backpack storage, save migration, replacement stats, persistence with changed runtime IDs, missing definitions, paused confirmation, real editor/stats hooks, deterministic hashes and the real mod loader in an isolated process. They use synthetic game data and do not modify the installed game or saves.
@@ -140,10 +149,14 @@ The interaction checks use a fixed fixture so story and balance edits do not alt
 
 Expansion checks verify the exact eighteen-origin roster, official tag assignments, new random-pool membership, nonnegative bonuses and preservation of the previous thirteen definitions except their tags. Saves made with that previous catalog are loaded with the expanded catalog to check stable assignments, non-stacking bonuses and no retroactive equipment grants.
 
+Persistence checks use the actual save capture, on-disk writer/reader, mod sidecar envelope, loader and import filter in temporary worlds. Four characters share a name but have different origins; one has queued equipment. Three normal roundtrips and four imports check unchanged trained values, single capped modifier sets, restricted-origin retention, old-save field migration, consumed items and exact remaining deliveries. They also compare capped Toughness against the real coma and damage formulas at 100. Run these alone with `--audit-origins`; the observations are written to `artifacts/origin-024-audit.json`.
+
+Progression checks exercise real bound XP calls, racial and per-skill XP multipliers, medical and mass-combat gains, dummy limits, repeated gains without a refresh, testing origins, legacy trained values over 100, changes from other modifiers and identical XP state with one and four worker threads.
+
 To validate another candidate without deploying or replacing the bundled JSON:
 
 ```sh
-python3 scripts/check.py /path/to/Meitou/versions/0.23.2 --ui-root /path/to/Kenshi --validate-origins /path/to/originform.json
+python3 scripts/check.py /path/to/Meitou/versions/0.24.0 --ui-root /path/to/Kenshi --validate-origins /path/to/originform.json
 ```
 
 Pass `--ui-root /path/to/Kenshi` to exercise the installed native editor layout and templates as well: mouse/keyboard dropdown selection including Random, search typing and Enter handling, horizontal tag scrolling and filtering, automatic draft saving, character/view switching, difficulty labels, scrolling and panel bounds at three resolutions. It also checks all bundled item IDs against the installed vanilla database and verifies the Gunner's ammunition. These checks use the game's screen router, including its disabled-by-default button bindings, and read assets without copying them into the project.
@@ -155,13 +168,13 @@ Add `--ui-theme /path/to/Dark-UI-mod` to test an installed theme's layouts and s
 To regenerate the two empty `.mod` headers using Meitou's own writer:
 
 ```sh
-python3 scripts/check.py /path/to/Meitou/versions/0.23.2 --generate
+python3 scripts/check.py /path/to/Meitou/versions/0.24.0 --generate
 ```
 
 To regenerate the bundled vanilla item reference after a game-data update:
 
 ```sh
-python3 scripts/check.py /path/to/Meitou/versions/0.23.2 --ui-root /path/to/Kenshi --export-vanilla-items
+python3 scripts/check.py /path/to/Meitou/versions/0.24.0 --ui-root /path/to/Kenshi --export-vanilla-items
 ```
 
 This export reads only the fixed core file list, validates each listed record through the installed release's item factory, checks bundled origin grants are covered, and writes `VANILLA_ITEMS.md` and `VANILLA_ITEMS.csv`. It does not modify the installation or run gameplay checks. Source version and file hashes are recorded in the reference.
@@ -169,9 +182,10 @@ This export reads only the fixed core file list, validates each listed record th
 ## Prototype limits
 
 - Animals receive random origins, but the game's animal editor only supports renaming, so it offers no manual origin selector.
-- Installing on an existing save assigns random origins to existing player characters. An import starts fresh origin assignments, as the engine resets lasting IDs and mod sidecars on import.
+- Installing on an existing save assigns random origins to player characters without saved origin data. Imports preserve fields saved by 0.4.1 or later; older saves need one normal load-and-save first.
+- Preexisting trained levels or other mods can still exceed 100; Origins preserves them and contributes zero where no room remains. Its cap applies before equipment, injury and age multipliers. Other mods that directly edit trained stats or modifiers take effect in the cap calculation at the next serial refresh.
 - If a saved origin's pack is missing, its ID is retained and displayed as unavailable, with no origin bonuses. Restoring the pack restores its bonuses on the next load. Changes to an origin definition take effect after restarting and loading.
 - No quirks or race-specific origin pools yet. Creation's random selection excludes testing-only definitions; later characters also exclude start-only origins. Debt, past crimes and similar story details are flavour text without additional mechanics.
-- The UI hooks target MeitouClient 0.23.2. Native controls and rendered previews are checked; full vanilla/modded Game Start playtesting still needs an in-game pass.
+- The UI hooks target MeitouClient 0.24.0. Native controls and rendered previews are checked; full vanilla/modded Game Start playtesting still needs an in-game pass.
 
-API reference: [Meitou documentation at the target build](https://github.com/VlcekM/MeitouClient/blob/v0.23.2/docs/modding.md).
+API reference: [Meitou documentation at the target build](https://github.com/VlcekM/MeitouClient/blob/v0.24.0/docs/modding.md).
